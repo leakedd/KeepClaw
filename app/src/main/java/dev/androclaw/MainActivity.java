@@ -29,6 +29,20 @@ public class MainActivity extends Activity {
     private TextView status;
     private TextView detail;
     private View dot;
+    private View loading;
+
+    /** Touche de finition appliquee a la console web : barres de defilement fines,
+     *  selection teintee, fond identique au shell. Idempotent. */
+    private static final String CONSOLE_SKIN =
+            "(function(){if(document.getElementById('ac-skin'))return;"
+            + "var s=document.createElement('style');s.id='ac-skin';"
+            + "s.textContent='::-webkit-scrollbar{width:8px;height:8px}"
+            + "::-webkit-scrollbar-thumb{background:#26262F;border-radius:8px}"
+            + "::-webkit-scrollbar-track{background:transparent}"
+            + "::selection{background:rgba(108,198,255,.30)}"
+            + "html{background:#0A0A0E}"
+            + "input,textarea,select{border-radius:12px}';"
+            + "document.head.appendChild(s);})();";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,7 +81,13 @@ public class MainActivity extends Activity {
         s.setBuiltInZoomControls(false);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         s.setMediaPlaybackRequiresUserGesture(true);
-        web.setWebViewClient(new WebViewClient());
+        loading = findViewById(R.id.loading);
+        web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView v, String url) {
+                loading.setVisibility(View.GONE);
+                v.evaluateJavascript(CONSOLE_SKIN, null);
+            }
+        });
         web.setBackgroundColor(0xFF0A0A0E);
         setState(R.color.muted, R.string.status_idle, null);
 
@@ -118,6 +138,8 @@ public class MainActivity extends Activity {
     /** Attend que le port 18800 réponde (max ~40 s) puis charge la console. */
     private void waitAndLoad() {
         setState(R.color.warn, R.string.state_starting, null);
+        ((TextView) findViewById(R.id.loading_text)).setText(R.string.loading_console);
+        loading.setVisibility(View.VISIBLE);
         new Thread(new Runnable() {
             @Override public void run() {
                 boolean up = false;
@@ -139,6 +161,8 @@ public class MainActivity extends Activity {
                             web.loadUrl(CoreService.BASE);
                         } else {
                             setState(R.color.danger, R.string.state_unreachable, null);
+                            ((TextView) findViewById(R.id.loading_text)).setText(R.string.loading_failed);
+                            loading.setVisibility(View.VISIBLE);
                         }
                     }
                 });
@@ -160,6 +184,7 @@ public class MainActivity extends Activity {
 
     private void wipe() {
         setState(R.color.warn, R.string.state_wiping, null);
+        loading.setVisibility(View.VISIBLE);
         web.loadUrl("about:blank");
         new Thread(new Runnable() {
             @Override public void run() {

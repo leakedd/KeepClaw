@@ -7,6 +7,8 @@
 
     <!-- Ligne secondaire sous le nom -->
     <string name="detail_offline">moteur hors ligne</string>
+    <string name="loading_console">Connexion à la console…</string>
+    <string name="loading_failed">Console injoignable — réessayez avec ↻</string>
     <string name="state_running">actif</string>
     <string name="state_starting">démarrage…</string>
     <string name="state_stopped">arrêté</string>

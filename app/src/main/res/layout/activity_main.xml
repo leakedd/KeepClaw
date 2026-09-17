@@ -15,8 +15,8 @@
         android:background="@color/bg_header"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:paddingTop="13dp"
-        android:paddingBottom="13dp">
+        android:paddingTop="11dp"
+        android:paddingBottom="11dp">
 
         <FrameLayout
             android:layout_width="40dp"
@@ -94,7 +94,7 @@
         android:layout_height="1dp"
         android:background="@color/divider" />
 
-    <!-- Contrôles du moteur -->
+    <!-- Contrôles du moteur : action primaire, actions neutres, action destructive -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -107,71 +107,71 @@
 
         <ImageButton
             android:id="@+id/btn_start"
-            android:defaultFocusHighlightEnabled="false"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_btn"
+            android:defaultFocusHighlightEnabled="false"
+            android:background="@drawable/bg_btn_primary"
             android:src="@drawable/ic_play"
-            android:tint="@color/text_soft"
+            android:tint="@color/accent"
             android:scaleType="centerInside"
-            android:padding="11dp"
+            android:padding="12dp"
             android:contentDescription="@string/btn_start" />
 
         <ImageButton
             android:id="@+id/btn_stop"
-            android:defaultFocusHighlightEnabled="false"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
+            android:defaultFocusHighlightEnabled="false"
             android:background="@drawable/bg_btn"
             android:src="@drawable/ic_stop"
             android:tint="@color/text_soft"
             android:scaleType="centerInside"
-            android:padding="11dp"
+            android:padding="12dp"
             android:contentDescription="@string/btn_stop" />
 
         <ImageButton
             android:id="@+id/btn_reload"
-            android:defaultFocusHighlightEnabled="false"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
+            android:defaultFocusHighlightEnabled="false"
             android:background="@drawable/bg_btn"
             android:src="@drawable/ic_sync"
             android:tint="@color/text_soft"
             android:scaleType="centerInside"
-            android:padding="11dp"
+            android:padding="12dp"
             android:contentDescription="@string/btn_reload" />
 
         <ImageButton
             android:id="@+id/btn_battery"
-            android:defaultFocusHighlightEnabled="false"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
+            android:defaultFocusHighlightEnabled="false"
             android:background="@drawable/bg_btn"
             android:src="@drawable/ic_battery"
             android:tint="@color/text_soft"
             android:scaleType="centerInside"
-            android:padding="11dp"
+            android:padding="12dp"
             android:contentDescription="@string/btn_battery" />
 
         <ImageButton
             android:id="@+id/btn_wipe"
-            android:defaultFocusHighlightEnabled="false"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_btn"
+            android:defaultFocusHighlightEnabled="false"
+            android:background="@drawable/bg_btn_danger"
             android:src="@drawable/ic_delete"
             android:tint="@color/danger"
             android:scaleType="centerInside"
-            android:padding="11dp"
+            android:padding="12dp"
             android:contentDescription="@string/btn_wipe" />
     </LinearLayout>
 
@@ -180,9 +180,39 @@
         android:layout_height="1dp"
         android:background="@color/divider" />
 
-    <WebView
-        android:id="@+id/web"
+    <!-- Console + état de chargement (jamais de zone noire muette) -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <WebView
+            android:id="@+id/web"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <LinearLayout
+            android:id="@+id/loading"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@color/bg">
+
+            <ProgressBar
+                android:id="@+id/spinner"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:indeterminateTint="@color/accent" />
+
+            <TextView
+                android:id="@+id/loading_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/loading_console"
+                android:textColor="@color/muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>
