@@ -10,7 +10,7 @@ cd "$ROOT"
 [ -f keystore.properties ] || "$ROOT/scripts/init-keystore.sh"
 
 # Les binaires natifs ne sont pas versionnés : ils se régénèrent depuis le sous-module picoclaw.
-if [ ! -f app/src/main/jniLibs/arm64-v8a/libpicoclaw.so ] || [ ! -f app/src/main/jniLibs/arm64-v8a/liblauncher.so ]; then
+if [ ! -f app/src/main/jniLibs/arm64-v8a/libcore.so ] || [ ! -f app/src/main/jniLibs/arm64-v8a/libconsole.so ]; then
   echo "binaires natifs absents dans app/src/main/jniLibs/arm64-v8a/." >&2
   echo "clone initial : git clone --recursive <url>  (ou : git submodule update --init --recursive)" >&2
   echo "puis        : ./scripts/build-native.sh" >&2

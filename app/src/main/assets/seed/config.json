@@ -9,7 +9,6 @@
   "isolation": {},
   "agents": {
     "defaults": {
-      "workspace": "/data/data/com.termux/files/home/.picoclaw/workspace",
       "restrict_to_workspace": true,
       "allow_read_outside_workspace": false,
       "provider": "",
@@ -61,7 +60,7 @@
       },
       "settings": {
         "email": "@nine.testrun.org",
-        "display_name": "PicoClaw Bot"
+        "display_name": "AndroClaw Bot"
       }
     },
     "dingtalk": {
@@ -118,7 +117,7 @@
       "settings": {
         "server": "",
         "tls": true,
-        "nick": "picoclaw",
+        "nick": "androclaw",
         "sasl_user": "",
         "channels": []
       }

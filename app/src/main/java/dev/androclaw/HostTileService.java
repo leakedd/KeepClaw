@@ -9,7 +9,7 @@ import android.service.quicksettings.TileService;
 /**
  * Tuile « AndroClaw » du volet rapide : une slide, un tap = démarrage ou coupure immédiate.
  */
-public class ClawTileService extends TileService {
+public class HostTileService extends TileService {
 
     @Override
     public void onStartListening() {
@@ -25,12 +25,12 @@ public class ClawTileService extends TileService {
 
     @Override
     public void onClick() {
-        Intent i = new Intent(this, ClawService.class);
-        if (ClawService.isRunning()) {
-            i.setAction(ClawService.ACTION_STOP);
+        Intent i = new Intent(this, CoreService.class);
+        if (CoreService.isRunning()) {
+            i.setAction(CoreService.ACTION_STOP);
             startService(i);
         } else {
-            i.setAction(ClawService.ACTION_START);
+            i.setAction(CoreService.ACTION_START);
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
             else startService(i);
         }
@@ -40,7 +40,7 @@ public class ClawTileService extends TileService {
     private void update() {
         Tile t = getQsTile();
         if (t == null) return;
-        boolean on = ClawService.isRunning();
+        boolean on = CoreService.isRunning();
         t.setState(on ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
         t.setLabel("AndroClaw");
         if (Build.VERSION.SDK_INT >= 29) {

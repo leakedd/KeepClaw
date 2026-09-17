@@ -21,7 +21,7 @@ public class BootReceiver extends BroadcastReceiver {
                 && !"android.intent.action.MY_PACKAGE_REPLACED".equals(action)) return;
 
         Log.i("AndroClaw", "boot reçu : " + action + " -> démarrage du gateway");
-        Intent i = new Intent(context, ClawService.class).setAction(ClawService.ACTION_START);
+        Intent i = new Intent(context, CoreService.class).setAction(CoreService.ACTION_START);
         try {
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
             else context.startService(i);

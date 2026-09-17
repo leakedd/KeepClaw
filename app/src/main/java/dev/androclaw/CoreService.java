@@ -31,16 +31,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AndroClaw — héberge le gateway picoclaw + la console web dans un foreground service
+ * AndroClaw — héberge le moteur + la console web dans un foreground service
  * « façon VPN/Spotify » : notification permanente, redémarrage START_STICKY, arrêt manuel
  * depuis la notification (visible sur l'écran verrouillé) ou depuis la tuile du volet rapide.
  *
  * Deux binaires Go sont embarqués dans jniLibs (extraits par PackageManager dans
  * nativeLibraryDir, la seule zone exec-able pour une app targetSdk >= 29) :
- *   liblauncher.so  -> picoclaw-launcher (console web + spawn du core)   port 18800
- *   libpicoclaw.so  -> picoclaw (agent + gateway), passé via PICOCLAW_BINARY
+ *   libconsole.so  -> console (serveur web + spawn du moteur)          port 18800
+ *   libcore.so  -> moteur (agent + gateway), passé via ANDROCLAW_BINARY
  */
-public class ClawService extends Service {
+public class CoreService extends Service {
 
     public static final String ACTION_START  = "dev.androclaw.action.START";
     public static final String ACTION_STOP   = "dev.androclaw.action.STOP";
@@ -74,16 +74,16 @@ public class ClawService extends Service {
         String action = (intent == null || intent.getAction() == null) ? ACTION_START : intent.getAction();
 
         if (ACTION_STOP.equals(action)) {
-            stopClaw();
+            stopCore();
             return START_NOT_STICKY;
         }
         if (ACTION_TOGGLE.equals(action) && sRunning) {
-            stopClaw();
+            stopCore();
             return START_NOT_STICKY;
         }
 
         goForeground("Démarrage…");
-        if (!sRunning) startClaw();
+        if (!sRunning) startCore();
         return START_STICKY;
     }
 
@@ -92,7 +92,7 @@ public class ClawService extends Service {
 
     @Override
     public void onDestroy() {
-        killClaw();
+        killCore();
         super.onDestroy();
     }
 
@@ -105,19 +105,19 @@ public class ClawService extends Service {
 
     // ------------------------------------------------------------------ démarrage
 
-    private void startClaw() {
+    private void startCore() {
         sRunning = true;
         setState("démarrage");
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    final File home = new File(getFilesDir(), "picoclaw");
+                    final File home = new File(getFilesDir(), "core");
                     if (!home.isDirectory() && !home.mkdirs()) throw new IOException("mkdir " + home);
                     final File logFile = new File(getFilesDir(), "gateway.log");
 
                     final String nativeDir = getApplicationInfo().nativeLibraryDir;
-                    final File launcher = new File(nativeDir, "liblauncher.so");
-                    final File core     = new File(nativeDir, "libpicoclaw.so");
+                    final File launcher = new File(nativeDir, "libconsole.so");
+                    final File core     = new File(nativeDir, "libcore.so");
                     if (!launcher.isFile()) throw new IOException("binaire launcher absent : " + launcher);
                     if (!core.isFile())     throw new IOException("binaire core absent : " + core);
                     makeExecutable(launcher);
@@ -137,10 +137,10 @@ public class ClawService extends Service {
                     pb.redirectErrorStream(true);
                     final Map<String, String> env = pb.environment();
                     env.put("HOME", getFilesDir().getAbsolutePath());
-                    env.put("PICOCLAW_HOME", home.getAbsolutePath());
-                    env.put("PICOCLAW_BINARY", core.getAbsolutePath());
-                    env.put("PICOCLAW_BUILTIN_SKILLS", new File(getFilesDir(), "skills").getAbsolutePath());
-                    env.put("PICOCLAW_LAUNCHER_HOST", "127.0.0.1");
+                    env.put("ANDROCLAW_HOME", home.getAbsolutePath());
+                    env.put("ANDROCLAW_BINARY", core.getAbsolutePath());
+                    env.put("ANDROCLAW_BUILTIN_SKILLS", new File(getFilesDir(), "skills").getAbsolutePath());
+                    env.put("ANDROCLAW_LAUNCHER_HOST", "127.0.0.1");
                     env.put("TMPDIR", getCacheDir().getAbsolutePath());
                     env.put("PATH", "/system/bin:/system/xbin");
 
@@ -163,7 +163,7 @@ public class ClawService extends Service {
                                 w.close();
                             } catch (Exception ignored) { }
                         }
-                    }, "claw-log");
+                    }, "core-log");
                     pump.setDaemon(true);
                     pump.start();
 
@@ -183,13 +183,13 @@ public class ClawService extends Service {
                         goForeground("AndroClaw · démarrage lent");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "startClaw a échoué", e);
+                    Log.e(TAG, "startCore a échoué", e);
                     sRunning = false;
                     setState("échec : " + e.getMessage());
                     goForeground("Échec : " + e.getMessage());
                 }
             }
-        }, "claw-start").start();
+        }, "core-start").start();
     }
 
     /**
@@ -219,15 +219,20 @@ public class ClawService extends Service {
      */
     public static void wipeAll(Context ctx) {
         try {
-            ctx.stopService(new Intent(ctx, ClawService.class));
+            ctx.stopService(new Intent(ctx, CoreService.class));
         } catch (Throwable t) {
             Log.w(TAG, "stopService : " + t);
         }
         sRunning = false;
         try { Thread.sleep(900); } catch (InterruptedException ignored) { }
 
-        File dir = new File(ctx.getFilesDir(), "picoclaw");
+        File dir = new File(ctx.getFilesDir(), "core");
         deleteTree(dir);
+        // ancien emplacement (avant le renommage) : purge pour que la réinitialisation soit complète
+        deleteTree(new File(ctx.getFilesDir(), "picoclaw"));
+        // et le dossier historique du moteur (skills / sessions)
+        deleteTree(new File(ctx.getFilesDir(), ".androclaw"));
+        deleteTree(new File(ctx.getFilesDir(), ".picoclaw"));
 
         try {
             CookieManager cm = CookieManager.getInstance();
@@ -281,7 +286,7 @@ public class ClawService extends Service {
                 }
                 Log.i(TAG, "aucune session console : démarrer le gateway depuis l'UI (bouton Start Gateway)");
             }
-        }, "claw-gwstart").start();
+        }, "core-gwstart").start();
     }
 
     /** Première exécution : copie le config.json d'exemple (modèles + en-têtes opencode-go). */
@@ -304,12 +309,12 @@ public class ClawService extends Service {
 
     // ------------------------------------------------------------------ arrêt
 
-    private void stopClaw() {
+    private void stopCore() {
         setState("arrêt");
         // 1) arrêt propre du gateway demandé au launcher
         httpPost(BASE + "/api/gateway/stop", 2500);
         // 2) on tue l'arbre de process (core compris)
-        killClaw();
+        killCore();
         sRunning = false;
         sPid = -1;
         setState("arrêté");
@@ -318,7 +323,7 @@ public class ClawService extends Service {
         stopSelf();
     }
 
-    private void killClaw() {
+    private void killCore() {
         int pid = sPid > 0 ? sPid : (proc != null ? pidOf(proc) : -1);
         if (pid > 0) killTree(pid);
         if (proc != null) {
@@ -327,7 +332,7 @@ public class ClawService extends Service {
         }
     }
 
-    /** Tue récursivement (enfants d'abord) : le launcher spawn le core picoclaw. */
+    /** Tue récursivement (enfants d'abord) : la console spawn le moteur. */
     private void killTree(int root) {
         try {
             List<Integer> pids = new ArrayList<Integer>();
@@ -371,7 +376,7 @@ public class ClawService extends Service {
         if (nm == null) return;
         NotificationChannel ch = new NotificationChannel(CH_ID, "Gateway AndroClaw",
                 NotificationManager.IMPORTANCE_LOW);
-        ch.setDescription("Statut du gateway picoclaw hébergé par AndroClaw");
+        ch.setDescription("Statut du moteur hébergé par AndroClaw");
         ch.setShowBadge(false);
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
@@ -382,7 +387,7 @@ public class ClawService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Intent stopIntent = new Intent(this, ClawService.class).setAction(ACTION_STOP);
+        Intent stopIntent = new Intent(this, CoreService.class).setAction(ACTION_STOP);
         PendingIntent psi = PendingIntent.getService(this, 1, stopIntent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
@@ -390,7 +395,7 @@ public class ClawService extends Service {
                 Icon.createWithResource(this, R.drawable.ic_stop), "Arrêter", psi).build();
 
         Notification.Builder b = new Notification.Builder(this, CH_ID)
-                .setSmallIcon(R.drawable.ic_stat_claw)
+                .setSmallIcon(R.drawable.ic_stat_core)
                 .setContentTitle("AndroClaw")
                 .setContentText(text)
                 .setContentIntent(pi)

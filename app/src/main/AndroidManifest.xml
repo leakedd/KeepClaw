@@ -31,7 +31,7 @@
 
         <!-- Le gateway + la console web, en foreground service « façon VPN/Spotify » -->
         <service
-            android:name=".ClawService"
+            android:name=".CoreService"
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
@@ -42,9 +42,9 @@
 
         <!-- Tuile du volet rapide : une slide pour lancer/couper -->
         <service
-            android:name=".ClawTileService"
+            android:name=".HostTileService"
             android:exported="true"
-            android:icon="@drawable/ic_claw"
+            android:icon="@drawable/ic_core"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

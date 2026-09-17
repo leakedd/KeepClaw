@@ -35,6 +35,13 @@ if [ -f "$ROOT/scripts/fix-lockfile.py" ] && [ -f "$SRC/web/frontend/pnpm-lock.y
     && echo "   lockfile vérifié/dédupliqué" || echo "   (déduplication lockfile ignorée)"
 fi
 
+# Branding : applique notre marque (AndroClaw) sur les sources du sous-module avant compilation.
+# Idempotent (voir scripts/brand.py) : relancer ne change rien.
+if [ -f "$ROOT/scripts/brand.py" ]; then
+  echo "== 0/3 branding =="
+  python3 "$ROOT/scripts/brand.py" | sed 's/^/   /'
+fi
+
 echo "== 1/3 frontend (embed dans web/backend/dist) =="
 if [ ! -f "$SRC/web/backend/dist/index.html" ]; then
   echo "   build frontend requis (pnpm + vite)…"
@@ -45,15 +52,15 @@ else
   echo "   dist déjà présent"
 fi
 
-echo "== 2/3 core picoclaw =="
+echo "== 2/3 moteur (core) =="
 ( cd "$SRC" && GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
     go build -tags goolm,stdjson -ldflags "$LDFLAGS" \
-    -o "$JNI/libpicoclaw.so" ./cmd/picoclaw )
+    -o "$JNI/libcore.so" ./cmd/picoclaw )
 
-echo "== 3/3 console (launcher) =="
+echo "== 3/3 console =="
 ( cd "$SRC/web" && GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
     go build -tags stdjson -ldflags "$LDFLAGS" \
-    -o "$JNI/liblauncher.so" ./backend )
+    -o "$JNI/libconsole.so" ./backend )
 
 echo
 ls -lh "$JNI" | tail -4

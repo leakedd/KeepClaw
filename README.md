@@ -30,9 +30,9 @@ Android 15+ interdit les types d'FGS `dataSync`/`mediaProcessing` lancés depuis
 ```
 APK AndroClaw (dev.androclaw)
 ├── app/src/main/jniLibs/arm64-v8a/
-│   ├── libpicoclaw.so   ← picoclaw core (agent + gateway)     GOOS=android GOARCH=arm64
-│   └── liblauncher.so   ← picoclaw-launcher (console web)     port 18800, 127.0.0.1
-├── ClawService     foreground service : spawn le launcher, PICOCLAW_BINARY=libpicoclaw.so
+│   ├── libcore.so   ← picoclaw core (agent + gateway)     GOOS=android GOARCH=arm64
+│   └── libconsole.so   ← console (console web)     port 18800, 127.0.0.1
+├── ClawService     foreground service : spawn le launcher, PICOCLAW_BINARY=libcore.so
 ├── MainActivity    WebView sur http://127.0.0.1:18800 + barre ▶ ■ ↻ 🔋
 ├── ClawTileService tuile du volet rapide (slide = on/off)
 ├── BootReceiver    relance au démarrage
@@ -87,6 +87,26 @@ platform 36 + build-tools 36.0.0**, **protoc non requis**.
 build, régénérés par `scripts/build-native.sh`. `scripts/build-apk.sh` s'arrête avec un message explicite
 si on l'appelle avant.
 
+### Marque (branding)
+
+Le moteur et la console viennent du sous-module épinglé : notre marque leur est appliquée par
+**`scripts/brand.py`**, appelé automatiquement par `scripts/build-native.sh` (idempotent ; `--check` pour
+un dry-run, il n'écrit rien). Ce qui est remplacé :
+
+| Cible | Avant | Après |
+|---|---|---|
+| Titre + textes de la console (6 langues) | `PicoClaw` | `AndroClaw` |
+| Identité de l'agent (system prompt) | `You are picoclaw` | `You are AndroClaw` |
+| Variables d'environnement | `PICOCLAW_HOME/BINARY/…` | `ANDROCLAW_HOME/BINARY/…` |
+| Cookie de session console | `picoclaw_launcher_auth` | `androclaw_launcher_auth` |
+| Dossiers/fichiers d'état | `.picoclaw`, `.picoclaw.pid` | `.androclaw`, `.androclaw.pid` |
+| Liens d'aide (console, tray) | `docs.picoclaw.io`, `github.com/sipeed/picoclaw` | dépôt AndroClaw |
+| `/api/update` (fork) | installait les binaires upstream | **désactivé** (écraserait nos `.so`) |
+
+Les **chemins d'import Go** (`github.com/sipeed/picoclaw/...`) ne sont jamais touchés : ce sont des
+identifiants de compilation, invisibles pour l'utilisateur. La documentation upstream (`docs/`,
+`workspace/`, `*.md`) n'est pas modifiée : elle n'est pas embarquée dans l'application.
+
 `./gradlew` est épinglé sur **Gradle 8.14.3** + **AGP 8.13.2** (JDK 21). Le projet n'a **aucune dépendance externe** : Java pur + API plateforme (WebView, Service, TileService, Notification) → build rapide, APK légère, surface d'attaque minimale.
 
 `scripts/build-native.sh` vérifie la présence du sous-module, déduplique le `pnpm-lock.yaml` upstream
@@ -127,8 +147,8 @@ Le fichier de travail est `config.json` dans `/data/data/dev.androclaw/files/pic
 
 | Contrôle | Résultat |
 |---|---|
-| Extraction des binaires natifs | `liblauncher.so` / `libpicoclaw.so` : `exec=true`, pas de `chmod` nécessaire (PackageManager les extrait exécutables) |
-| Enfant du service | `liblauncher.so` a bien pour parent le process `dev.androclaw` → le launcher suit la vie du service |
+| Extraction des binaires natifs | `libconsole.so` / `libcore.so` : `exec=true`, pas de `chmod` nécessaire (PackageManager les extrait exécutables) |
+| Enfant du service | `libconsole.so` a bien pour parent le process `dev.androclaw` → le launcher suit la vie du service |
 | Console | `/` → `302` (page de setup à froid) puis `200` ; `/api/auth/status` → `200` |
 | Service | `isForeground=true`, `types=0x40000000` (`specialUse`), notification `ONGOING|FOREGROUND`, `category=service`, `vis=PUBLIC`, 1 action |
 | UI | WebView rend la console, sélecteur de modèle sur `mimo` (seed pris en compte) |
@@ -141,4 +161,4 @@ Le fichier de travail est `config.json` dans `/data/data/dev.androclaw/files/pic
 - Pas de root, Knox intact : l'app reste dans son bac à sable ; elle ne lit que ses propres fichiers et `/sdcard` avec permission.
 - La console et l'API sont liées à **127.0.0.1** : rien n'est exposé sur le réseau local.
 - `specialUse` est accepté en sideload ; sur le Play Store il faudrait justifier le type (pas notre cas).
-- Le frontend React de la console est embarqué à la compilation : modifier l'UI impose de rebâtir `liblauncher.so`.
+- Le frontend React de la console est embarqué à la compilation : modifier l'UI impose de rebâtir `libconsole.so`.

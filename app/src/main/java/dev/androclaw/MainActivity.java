@@ -20,7 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * L'UI d'AndroClaw = la console web picoclaw (launcher) dans une WebView locale,
+ * L'UI d'AndroClaw = la console web (moteur + console Go) dans une WebView locale,
  * plus une barre de contrôle minimale (démarrer / arrêter / recharger / exemption batterie).
  */
 public class MainActivity extends Activity {
@@ -67,10 +67,10 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(0xFF101014);
 
         findViewById(R.id.btn_start).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startClaw(); }
+            @Override public void onClick(View v) { startCore(); }
         });
         findViewById(R.id.btn_stop).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { stopClaw(); }
+            @Override public void onClick(View v) { stopCore(); }
         });
         findViewById(R.id.btn_reload).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { waitAndLoad(); }
@@ -83,18 +83,18 @@ public class MainActivity extends Activity {
         });
 
         askNotifications();
-        startClaw();
+        startCore();
     }
 
-    private void startClaw() {
-        Intent i = new Intent(this, ClawService.class).setAction(ClawService.ACTION_START);
+    private void startCore() {
+        Intent i = new Intent(this, CoreService.class).setAction(CoreService.ACTION_START);
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
         else startService(i);
         waitAndLoad();
     }
 
-    private void stopClaw() {
-        startService(new Intent(this, ClawService.class).setAction(ClawService.ACTION_STOP));
+    private void stopCore() {
+        startService(new Intent(this, CoreService.class).setAction(CoreService.ACTION_STOP));
         status.setText("arrêté");
         Toast.makeText(this, "AndroClaw arrêté", Toast.LENGTH_SHORT).show();
     }
@@ -108,7 +108,7 @@ public class MainActivity extends Activity {
                 for (int i = 0; i < 80; i++) {
                     try {
                         java.net.HttpURLConnection c = (java.net.HttpURLConnection)
-                                new java.net.URL(ClawService.BASE + "/api/auth/status").openConnection();
+                                new java.net.URL(CoreService.BASE + "/api/auth/status").openConnection();
                         c.setConnectTimeout(1200);
                         c.setReadTimeout(1200);
                         if (c.getResponseCode() > 0) { up = true; c.disconnect(); break; }
@@ -119,15 +119,15 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (ok) {
-                            status.setText("actif · " + ClawService.BASE);
-                            web.loadUrl(ClawService.BASE);
+                            status.setText("actif · " + CoreService.BASE);
+                            web.loadUrl(CoreService.BASE);
                         } else {
                             status.setText("gateway injoignable — voir le journal");
                         }
                     }
                 });
             }
-        }, "claw-wait").start();
+        }, "core-wait").start();
     }
 
     /** Réinitialisation : mot de passe console, clés, canaux, conversations, carnet du gateway. */
@@ -147,15 +147,15 @@ public class MainActivity extends Activity {
         web.loadUrl("about:blank");
         new Thread(new Runnable() {
             @Override public void run() {
-                ClawService.wipeAll(MainActivity.this);
-                startClaw();   // relance : la console repart en « première ouverture »
+                CoreService.wipeAll(MainActivity.this);
+                startCore();   // relance : la console repart en « première ouverture »
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         Toast.makeText(MainActivity.this, "AndroClaw réinitialisé", Toast.LENGTH_SHORT).show();
                     }
                 });
             }
-        }, "claw-wipe").start();
+        }, "core-wipe").start();
     }
 
     private void requestBatteryExemption() {
