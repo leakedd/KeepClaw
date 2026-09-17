@@ -52,10 +52,16 @@ Résultat : à l'installation, PackageManager dépose les deux binaires dans `/d
 
 ```bash
 # 0) prérequis (macOS)
-brew install go gradle
+brew install go gradle openjdk@21
 brew install --cask android-commandlinetools
-sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-36" "build-tools;36.0.0" "cmdline-tools;latest"
 npm i -g pnpm@10.33.0          # frontend de la console
+
+# 0bis) environnement — à mettre dans ~/.zshrc (le projet n'exige rien d'autre)
+export JAVA_HOME="/opt/homebrew/opt/openjdk@21"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 # 1) sources du sous-module (épinglé sur le commit validé, cf. .gitmodules)
 git submodule update --init --recursive     # clone initial : git clone --recursive
@@ -69,7 +75,17 @@ git submodule update --init --recursive     # clone initial : git clone --recurs
 
 # 4) installation
 adb install -r app/build/outputs/apk/release/app-release.apk
+
+# 5) export (APK renommée + archive source + SHA256)
+./scripts/export.sh               # → dist/
 ```
+
+Versions validées : **Go 1.27.1**, **JDK 21.0.11** (openjdk@21), **Node 26 / pnpm 10.33**, **Android SDK
+platform 36 + build-tools 36.0.0**, **protoc non requis**.
+
+`app/src/main/jniLibs/` et `dist/` ne sont **pas versionnés** : les binaires natifs sont des artefacts de
+build, régénérés par `scripts/build-native.sh`. `scripts/build-apk.sh` s'arrête avec un message explicite
+si on l'appelle avant.
 
 `./gradlew` est épinglé sur **Gradle 8.14.3** + **AGP 8.13.2** (JDK 21). Le projet n'a **aucune dépendance externe** : Java pur + API plateforme (WebView, Service, TileService, Notification) → build rapide, APK légère, surface d'attaque minimale.
 
