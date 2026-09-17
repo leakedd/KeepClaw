@@ -9,6 +9,14 @@ cd "$ROOT"
 [ -f local.properties ] || echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 [ -f keystore.properties ] || "$ROOT/scripts/init-keystore.sh"
 
+# Les binaires natifs ne sont pas versionnés : ils se régénèrent depuis le sous-module picoclaw.
+if [ ! -f app/src/main/jniLibs/arm64-v8a/libpicoclaw.so ] || [ ! -f app/src/main/jniLibs/arm64-v8a/liblauncher.so ]; then
+  echo "binaires natifs absents dans app/src/main/jniLibs/arm64-v8a/." >&2
+  echo "clone initial : git clone --recursive <url>  (ou : git submodule update --init --recursive)" >&2
+  echo "puis        : ./scripts/build-native.sh" >&2
+  exit 1
+fi
+
 TASK="${1:-assembleRelease}"
 echo "== gradle $TASK =="
 ./gradlew --no-daemon "$TASK" 2>&1 | tail -25
