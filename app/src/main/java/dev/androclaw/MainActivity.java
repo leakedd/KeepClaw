@@ -27,6 +27,8 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private TextView status;
+    private TextView detail;
+    private View dot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +36,8 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         status = findViewById(R.id.status);
+        detail = findViewById(R.id.detail);
+        dot    = findViewById(R.id.dot);
         web    = findViewById(R.id.web);
 
         // Android 15+ (targetSdk 35+) impose l'edge-to-edge : sans ceci, le bandeau passe SOUS la
@@ -64,7 +68,8 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         s.setMediaPlaybackRequiresUserGesture(true);
         web.setWebViewClient(new WebViewClient());
-        web.setBackgroundColor(0xFF101014);
+        web.setBackgroundColor(0xFF0A0A0E);
+        setState(R.color.muted, R.string.status_idle, null);
 
         findViewById(R.id.btn_start).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startCore(); }
@@ -86,6 +91,17 @@ public class MainActivity extends Activity {
         startCore();
     }
 
+    /**
+     * Met a jour la pastille d'etat (point colore + libelle) et la ligne secondaire.
+     * detailText == null -> « moteur hors ligne ».
+     */
+    private void setState(int colorRes, int labelRes, String detailText) {
+        status.setText(labelRes);
+        detail.setText(detailText != null ? detailText : getString(R.string.detail_offline));
+        dot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(colorRes, getTheme())));
+    }
+
     private void startCore() {
         Intent i = new Intent(this, CoreService.class).setAction(CoreService.ACTION_START);
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
@@ -95,13 +111,13 @@ public class MainActivity extends Activity {
 
     private void stopCore() {
         startService(new Intent(this, CoreService.class).setAction(CoreService.ACTION_STOP));
-        status.setText("arrêté");
+        setState(R.color.muted, R.string.state_stopped, null);
         Toast.makeText(this, "AndroClaw arrêté", Toast.LENGTH_SHORT).show();
     }
 
     /** Attend que le port 18800 réponde (max ~40 s) puis charge la console. */
     private void waitAndLoad() {
-        status.setText("démarrage…");
+        setState(R.color.warn, R.string.state_starting, null);
         new Thread(new Runnable() {
             @Override public void run() {
                 boolean up = false;
@@ -119,10 +135,10 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (ok) {
-                            status.setText("actif · " + CoreService.BASE);
+                            setState(R.color.ok, R.string.state_running, CoreService.BASE.replace("http://", ""));
                             web.loadUrl(CoreService.BASE);
                         } else {
-                            status.setText("gateway injoignable — voir le journal");
+                            setState(R.color.danger, R.string.state_unreachable, null);
                         }
                     }
                 });
@@ -143,7 +159,7 @@ public class MainActivity extends Activity {
     }
 
     private void wipe() {
-        status.setText("réinitialisation…");
+        setState(R.color.warn, R.string.state_wiping, null);
         web.loadUrl("about:blank");
         new Thread(new Runnable() {
             @Override public void run() {

@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#101014</color>
+    <color name="ic_launcher_background">#0A0A0E</color>
+
+    <!-- Palette sombre d'AndroClaw -->
+    <color name="bg">#FF0A0A0E</color>
+    <color name="bg_header">#FF0F0F14</color>
+    <color name="surface">#FF15151C</color>
+    <color name="border">#FF23232D</color>
+    <color name="divider">#FF1A1A22</color>
+    <color name="text">#FFF2F3F7</color>
+    <color name="text_soft">#FFC9CBD6</color>
+    <color name="muted">#FF7C7F8C</color>
+    <color name="accent">#FF6CC6FF</color>
+    <color name="ok">#FF34D399</color>
+    <color name="warn">#FFFBBF24</color>
+    <color name="danger">#FFFF8A8A</color>
 </resources>
