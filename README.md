@@ -87,6 +87,18 @@ platform 36 + build-tools 36.0.0**, **protoc non requis**.
 build, régénérés par `scripts/build-native.sh`. `scripts/build-apk.sh` s'arrête avec un message explicite
 si on l'appelle avant.
 
+### Développer sur le Mac (sans téléphone)
+
+`scripts/dev-macos.sh` compile le **même code** pour darwin et sert la console en local — pratique pour
+itérer sur l'UI, ou pour vérifier une release avant de flasher :
+
+```bash
+./scripts/dev-macos.sh                  # → http://127.0.0.1:18899
+AC_PORT=19000 ./scripts/dev-macos.sh    # autre port
+```
+
+Les données de dev restent dans `dist/dev/home` (jamais celles de l'application Android).
+
 ### Marque (branding)
 
 Le moteur et la console viennent du sous-module épinglé : notre marque leur est appliquée par
