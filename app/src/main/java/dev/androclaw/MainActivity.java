@@ -36,6 +36,24 @@ public class MainActivity extends Activity {
         status = findViewById(R.id.status);
         web    = findViewById(R.id.web);
 
+        // Android 15+ (targetSdk 35+) impose l'edge-to-edge : sans ceci, le bandeau passe SOUS la
+        // barre d'état (heure/batterie) et devient partiellement intouchable. On réserve les insets
+        // système (haut = barre d'état, bas = barre de navigation).
+        final View root = findViewById(R.id.root);
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override public android.view.WindowInsets onApplyWindowInsets(View v, android.view.WindowInsets insets) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.graphics.Insets b = insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                    v.setPadding(b.left, b.top, b.right, b.bottom);
+                } else {
+                    v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                            insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+                }
+                return insets;
+            }
+        });
+        root.requestApplyInsets();
+
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
