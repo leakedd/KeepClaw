@@ -20,6 +20,11 @@
     <string name="btn_stop">Arrêter le moteur</string>
     <string name="btn_reload">Recharger la console</string>
     <string name="btn_battery">Exempter de l\'optimisation batterie</string>
+    <string name="lbl_start">Démarrer</string>
+    <string name="lbl_stop">Arrêter</string>
+    <string name="lbl_reload">Recharger</string>
+    <string name="lbl_battery">Batterie</string>
+    <string name="lbl_wipe">Effacer</string>
     <string name="btn_wipe">Réinitialiser AndroClaw</string>
 
     <string name="wipe_title">Réinitialiser AndroClaw ?</string>

@@ -7,6 +7,8 @@
     <color name="bg_header">#FF0F0F14</color>
     <color name="surface">#FF15151C</color>
     <color name="border">#FF23232D</color>
+    <color name="btn_bg">#FF26262E</color>
+    <color name="btn_border">#FF4D4D5A</color>
     <color name="divider">#FF1A1A22</color>
     <color name="text">#FFF2F3F7</color>
     <color name="text_soft">#FFC9CBD6</color>

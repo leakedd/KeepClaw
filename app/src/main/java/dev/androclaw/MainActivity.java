@@ -137,9 +137,13 @@ public class MainActivity extends Activity {
 
     /** Attend que le port 18800 réponde (max ~40 s) puis charge la console. */
     private void waitAndLoad() {
-        setState(R.color.warn, R.string.state_starting, null);
-        ((TextView) findViewById(R.id.loading_text)).setText(R.string.loading_console);
-        loading.setVisibility(View.VISIBLE);
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                setState(R.color.warn, R.string.state_starting, null);
+                ((TextView) findViewById(R.id.loading_text)).setText(R.string.loading_console);
+                loading.setVisibility(View.VISIBLE);
+            }
+        });
         new Thread(new Runnable() {
             @Override public void run() {
                 boolean up = false;
@@ -189,7 +193,9 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 CoreService.wipeAll(MainActivity.this);
-                startCore();   // relance : la console repart en « première ouverture »
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { startCore(); }   // relance sur le thread UI (touche des vues)
+                });
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         Toast.makeText(MainActivity.this, "AndroClaw réinitialisé", Toast.LENGTH_SHORT).show();
