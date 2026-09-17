@@ -57,9 +57,8 @@ brew install --cask android-commandlinetools
 sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 npm i -g pnpm@10.33.0          # frontend de la console
 
-# 1) sources
-git clone https://github.com/sipeed/picoclaw.git native/picoclaw
-cd native/picoclaw && git checkout bbf6893ca7af && cd ../..
+# 1) sources du sous-module (épinglé sur le commit validé, cf. .gitmodules)
+git submodule update --init --recursive     # clone initial : git clone --recursive
 
 # 2) binaires natifs (frontend + core + console → jniLibs)
 ./scripts/build-native.sh
@@ -73,6 +72,10 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 `./gradlew` est épinglé sur **Gradle 8.14.3** + **AGP 8.13.2** (JDK 21). Le projet n'a **aucune dépendance externe** : Java pur + API plateforme (WebView, Service, TileService, Notification) → build rapide, APK légère, surface d'attaque minimale.
+
+`scripts/build-native.sh` vérifie la présence du sous-module, déduplique le `pnpm-lock.yaml` upstream
+(bug connu : `ERR_PNPM_BROKEN_LOCKFILE`) puis compile les deux binaires Go pour `android/arm64` et les
+dépose dans `jniLibs/`.
 
 ## 4. Utilisation
 

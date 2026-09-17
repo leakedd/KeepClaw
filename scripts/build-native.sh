@@ -22,6 +22,19 @@ BUILDTIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 GOVER="$(go version | awk '{print $3}')"
 LDFLAGS="-X ${CONFIG_PKG}.Version=${VERSION} -X ${CONFIG_PKG}.GitCommit=${COMMIT} -X ${CONFIG_PKG}.BuildTime=${BUILDTIME} -X ${CONFIG_PKG}.GoVersion=${GOVER} -s -w"
 
+if [ ! -d "$SRC/cmd/picoclaw" ]; then
+  echo "ERREUR : sources picoclaw absentes de $SRC" >&2
+  echo "         récupérer le sous-module : git submodule update --init --recursive" >&2
+  exit 1
+fi
+
+# Le lockfile upstream contient des clés dupliquées que pnpm refuse (ERR_PNPM_BROKEN_LOCKFILE).
+# On le déduplique avant l'install : le bug est upstream, pas chez nous.
+if [ -f "$ROOT/scripts/fix-lockfile.py" ] && [ -f "$SRC/web/frontend/pnpm-lock.yaml" ]; then
+  python3 "$ROOT/scripts/fix-lockfile.py" "$SRC/web/frontend/pnpm-lock.yaml" >/dev/null 2>&1 \
+    && echo "   lockfile vérifié/dédupliqué" || echo "   (déduplication lockfile ignorée)"
+fi
+
 echo "== 1/3 frontend (embed dans web/backend/dist) =="
 if [ ! -f "$SRC/web/backend/dist/index.html" ]; then
   echo "   build frontend requis (pnpm + vite)…"
