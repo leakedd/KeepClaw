@@ -9,3 +9,8 @@ native/picoclaw/build/
 *.apk
 *.aab
 .DS_Store
+
+# artefacts de build (regeneres par scripts/build-native.sh)
+app/src/main/jniLibs/
+# exports locaux (APK signe + archive source)
+dist/
