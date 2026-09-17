@@ -1,0 +1,11 @@
+.gradle/
+build/
+local.properties
+keystore.properties
+keystore/
+native/picoclaw/web/frontend/node_modules/
+native/picoclaw/web/backend/dist/
+native/picoclaw/build/
+*.apk
+*.aab
+.DS_Store

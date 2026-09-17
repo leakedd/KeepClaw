@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône de notification : silhouette monochrome (Android ne garde que l'alpha) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,9C15.7,9 9,15.7 9,24C9,32.3 15.7,39 24,39C32.3,39 39,32.3 39,24C39,15.7 32.3,9 24,9ZM19,22m-2.6,0a2.6,2.6 0 1,0 5.2,0a2.6,2.6 0 1,0 -5.2,0ZM29,22m-2.6,0a2.6,2.6 0 1,0 5.2,0a2.6,2.6 0 1,0 -5.2,0Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,41L16,46L32,46Z" />
+</vector>

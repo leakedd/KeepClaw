@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AndroClaw</string>
+    <string name="status_idle">arrêté</string>
+    <string name="btn_start">▶</string>
+    <string name="btn_stop">■</string>
+    <string name="btn_reload">↻</string>
+    <string name="btn_battery">🔋</string>
+    <string name="btn_wipe">🗑</string>
+    <string name="wipe_title">Réinitialiser AndroClaw ?</string>
+    <string name="wipe_msg">Efface le mot de passe de la console, les clés d\'API, les canaux configurés, les conversations et le carnet du gateway. L\'app repart comme à la première ouverture. Cette action est irréversible.</string>
+    <string name="wipe_ok">Tout effacer</string>
+    <string name="wipe_cancel">Annuler</string>
+    <string name="notif_title">AndroClaw</string>
+    <string name="notif_stop">Arrêter</string>
+</resources>

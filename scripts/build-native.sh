@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# AndroClaw — compile les deux binaires Go (core + console) pour android/arm64
+# et les dépose dans app/src/main/jniLibs/arm64-v8a/ sous la forme lib*.so
+# (forme exigée par PackageManager pour être extraits vers nativeLibraryDir, zone exec-able).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$ROOT/native/picoclaw"
+JNI="$ROOT/app/src/main/jniLibs/arm64-v8a"
+export PATH="/opt/homebrew/bin:$PATH"
+export GOFLAGS="${GOFLAGS:-}"
+export CGO_ENABLED=0
+export GOOS=android
+export GOARCH=arm64
+
+mkdir -p "$JNI"
+
+CONFIG_PKG="github.com/sipeed/picoclaw/pkg/config"
+VERSION="$(cd "$SRC" && git describe --tags --always --dirty 2>/dev/null || echo dev)"
+COMMIT="$(cd "$SRC" && git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+BUILDTIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+GOVER="$(go version | awk '{print $3}')"
+LDFLAGS="-X ${CONFIG_PKG}.Version=${VERSION} -X ${CONFIG_PKG}.GitCommit=${COMMIT} -X ${CONFIG_PKG}.BuildTime=${BUILDTIME} -X ${CONFIG_PKG}.GoVersion=${GOVER} -s -w"
+
+echo "== 1/3 frontend (embed dans web/backend/dist) =="
+if [ ! -f "$SRC/web/backend/dist/index.html" ]; then
+  echo "   build frontend requis (pnpm + vite)…"
+  ( cd "$SRC/web/frontend" \
+    && CI=true pnpm install --frozen-lockfile \
+    && pnpm build:backend )
+else
+  echo "   dist déjà présent"
+fi
+
+echo "== 2/3 core picoclaw =="
+( cd "$SRC" && GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
+    go build -tags goolm,stdjson -ldflags "$LDFLAGS" \
+    -o "$JNI/libpicoclaw.so" ./cmd/picoclaw )
+
+echo "== 3/3 console (launcher) =="
+( cd "$SRC/web" && GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
+    go build -tags stdjson -ldflags "$LDFLAGS" \
+    -o "$JNI/liblauncher.so" ./backend )
+
+echo
+ls -lh "$JNI" | tail -4
+file "$JNI"/*.so 2>/dev/null | sed 's/^/  /' || true
+echo "OK — binaires natifs prêts (version ${VERSION} / ${COMMIT})"
