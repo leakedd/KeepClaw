@@ -56,6 +56,13 @@ public class CoreService extends Service {
     private static volatile boolean sRunning = false;
     private static volatile int     sPid     = -1;
     private static volatile String  sState   = "arrêté";
+    private static volatile String  sAgent   = "off";   // working | idle | off
+    private static volatile String  sModel   = "";
+
+    private volatile boolean statusLoop = false;
+
+    public static String agent() { return sAgent; }
+    public static String model() { return sModel; }
 
     private Process proc;
     private Thread  pump;
@@ -92,6 +99,7 @@ public class CoreService extends Service {
 
     @Override
     public void onDestroy() {
+        statusLoop = false;
         killCore();
         super.onDestroy();
     }
@@ -176,8 +184,9 @@ public class CoreService extends Service {
 
                     if (up) {
                         setState("actif · " + BASE);
-                        goForeground("Gateway actif · " + BASE);
+                        goForeground(getString(R.string.notif_starting));
                         autoStartGateway();
+                        startStatusLoop();
                     } else {
                         setState("démarrage lent — voir journal");
                         goForeground("AndroClaw · démarrage lent");
@@ -289,6 +298,92 @@ public class CoreService extends Service {
         }, "core-gwstart").start();
     }
 
+    /**
+     * Boucle de statut (5 s) : interroge la console locale pour savoir si le gateway
+     * tourne et si l'agent travaille (activité de session récente), puis met à jour
+     * la notification (visible sur l'écran verrouillé) et la pastille de l'app.
+     */
+    private void startStatusLoop() {
+        if (statusLoop) return;
+        statusLoop = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                long lastActivity = 0;
+                String lastUpdated = null;
+                while (statusLoop && sRunning) {
+                    String cookie = cookie();
+                    String st = cookie == null ? null : httpGet(BASE + "/api/gateway/status", 4000, cookie);
+                    boolean running = st != null && st.contains("\"gateway_status\":\"running\"");
+                    String model = jsonString(st, "config_default_model");
+                    if (model != null) sModel = model;
+
+                    if (running && cookie != null) {
+                        String sessions = httpGet(BASE + "/api/sessions", 5000, cookie);
+                        String updated = jsonString(sessions, "updated");
+                        if (updated != null && !updated.equals(lastUpdated)) {
+                            if (lastUpdated != null) lastActivity = System.currentTimeMillis();
+                            lastUpdated = updated;
+                        }
+                    }
+
+                    long now = System.currentTimeMillis();
+                    boolean working = running && lastActivity > 0 && (now - lastActivity) < 20000;
+
+                    if (!running) {
+                        sAgent = "off";
+                        updateNotif(getString(R.string.notif_gateway_off));
+                    } else if (working) {
+                        sAgent = "working";
+                        updateNotif(withModel(getString(R.string.notif_working)));
+                    } else {
+                        sAgent = "idle";
+                        updateNotif(withModel(getString(R.string.notif_idle)));
+                    }
+
+                    try { Thread.sleep(5000); } catch (InterruptedException e) { return; }
+                }
+            }
+        }, "agent-status").start();
+    }
+
+    private String withModel(String label) {
+        String m = sModel;
+        return (m == null || m.isEmpty()) ? label : label + " · " + m;
+    }
+
+    private String cookie() {
+        try {
+            String c = CookieManager.getInstance().getCookie(BASE);
+            return (c == null || c.isEmpty()) ? null : c;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Extrait la première valeur chaîne d'un champ JSON (sans dépendance). */
+    private static String jsonString(String json, String field) {
+        if (json == null) return null;
+        int i = json.indexOf("\"" + field + "\"");
+        if (i < 0) return null;
+        int c = json.indexOf(':', i);
+        if (c < 0) return null;
+        int q1 = json.indexOf('"', c + 1);
+        if (q1 < 0) return null;
+        int q2 = json.indexOf('"', q1 + 1);
+        if (q2 < 0) return null;
+        return json.substring(q1 + 1, q2);
+    }
+
+    private void updateNotif(String text) {
+        if (!sRunning) return;
+        try {
+            NotificationManager nm = getSystemService(NotificationManager.class);
+            if (nm != null) nm.notify(NOTIF, buildNotif(text));
+        } catch (Throwable t) {
+            Log.w(TAG, "notif : " + t);
+        }
+    }
+
     /** Première exécution : copie le config.json d'exemple (modèles + en-têtes opencode-go). */
     private void seedIfEmpty(File home) {
         File cfg = new File(home, "config.json");
@@ -311,6 +406,9 @@ public class CoreService extends Service {
 
     private void stopCore() {
         setState("arrêt");
+        statusLoop = false;
+        sAgent = "off";
+        sModel = "";
         // 1) arrêt propre du gateway demandé au launcher
         httpPost(BASE + "/api/gateway/stop", 2500);
         // 2) on tue l'arbre de process (core compris)

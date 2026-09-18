@@ -42,6 +42,20 @@ if [ -f "$ROOT/scripts/brand.py" ]; then
   python3 "$ROOT/scripts/brand.py" | sed 's/^/   /'
 fi
 
+# Correctifs UI mobiles : patches versionnes (scripts/patches/*.patch), idempotents.
+# A lancer avant le frontend : un patch fraichement applique invalide dist/.
+if [ -f "$ROOT/scripts/patch-ui.sh" ]; then
+  echo "== 0bis/3 correctifs UI =="
+  "$ROOT/scripts/patch-ui.sh" | sed 's/^/   /'
+fi
+
+# Branding console : logo avec texte + favicons generes depuis le logo AndroClaw
+# (les binaires du sous-module ne peuvent pas etre patchees proprement).
+if [ -f "$ROOT/scripts/make-icons.py" ]; then
+  echo "== 0ter/3 branding console =="
+  python3 "$ROOT/scripts/make-icons.py" --web | sed 's/^/   /'
+fi
+
 echo "== 1/3 frontend (embed dans web/backend/dist) =="
 if [ ! -f "$SRC/web/backend/dist/index.html" ]; then
   echo "   build frontend requis (pnpm + vite)…"

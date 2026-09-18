@@ -488,25 +488,23 @@
     },
     {
       "model_name": "opencode-go",
-      "provider": "",
+      "provider": "opencode-go",
       "model": "deepseek-v4.1-flash",
       "api_base": "https://opencode.ai/zen/go/v1",
       "custom_headers": {
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "x-opencode-session": "REMPLACER-par-votre-session-opencode-go"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       },
       "enabled": true
     },
     {
       "model_name": "mimo",
-      "provider": "",
+      "provider": "opencode-go",
       "model": "mimo-v2.5",
       "api_base": "https://opencode.ai/zen/go/v1",
       "custom_headers": {
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "x-opencode-session": "REMPLACER-par-votre-session-opencode-go"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       },
       "enabled": true
     }

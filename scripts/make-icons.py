@@ -15,11 +15,13 @@ Usage : python3 scripts/make-icons.py [chemin-du-logo-source]
 import os
 import sys
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "app/src/main/res")
-SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "assets", "logo-source.png")
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+ONLY_WEB = "--web" in sys.argv
+SRC = ARGS[0] if ARGS else os.path.join(ROOT, "assets", "logo-source.png")
 BG = (10, 10, 14, 255)      # fond de l'app (#0A0A0E)
 DARK = 52                   # seuil : en dessous = fond
 ASSET = 512                 # taille du logo transparent du depot
@@ -55,20 +57,21 @@ art = square(art, 0.97)
 print("source %dx%d -> logo transparent %dx%d" % (W, H, art.width, art.height))
 
 # 3) logo transparent du depot
-os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
-art.resize((ASSET, ASSET), Image.LANCZOS).save(os.path.join(ROOT, "assets", "logo.png"))
+if not ONLY_WEB:
+    os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
+    art.resize((ASSET, ASSET), Image.LANCZOS).save(os.path.join(ROOT, "assets", "logo.png"))
 
 DENS = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
 
 # 4) marque de l'en-tete (32 dp, fond transparent)
-for name, f in DENS.items():
+for name, f in ({} if ONLY_WEB else DENS).items():
     d = os.path.join(RES, "drawable-" + name)
     os.makedirs(d, exist_ok=True)
     t = int(32 * f)
     art.resize((t, t), Image.LANCZOS).save(os.path.join(d, "logo.png"))
 
 # 5) icones de lancement : logo blanc sur le fond de l'app
-for name, f in DENS.items():
+for name, f in ({} if ONLY_WEB else DENS).items():
     d = os.path.join(RES, "mipmap-" + name)
     os.makedirs(d, exist_ok=True)
     leg, fg = int(48 * f), int(108 * f)
@@ -94,4 +97,82 @@ for name, f in DENS.items():
     c.paste(r, ((fg - t) // 2, (fg - t) // 2), r)
     c.save(os.path.join(d, "ic_launcher_foreground.png"))
 
-print("ecrit: assets/logo.png + drawable-*/logo.png + mipmap-*")
+if not ONLY_WEB:
+    print("ecrit: assets/logo.png + drawable-*/logo.png + mipmap-*")
+
+# 6) assets de la console web (branding) : logo avec texte, favicons, manifeste.
+#    Generes ici (et non patchees en binaire) car ils derivent du meme logo source.
+WEB = os.path.join(ROOT, "native", "picoclaw", "web", "frontend", "public")
+if os.path.isdir(WEB):
+    def on_bg_square(img, side, ratio, radius=0):
+        c = Image.new("RGBA", (side, side), BG)
+        t = int(side * ratio)
+        r = img.resize((t, t), Image.LANCZOS)
+        c.paste(r, ((side - t) // 2, (side - t) // 2), r)
+        if radius > 0:
+            mask = Image.new("L", (side, side), 0)
+            ImageDraw.Draw(mask).rounded_rectangle((0, 0, side - 1, side - 1), radius=radius, fill=255)
+            c.putalpha(mask)
+        return c
+
+    # wordmark : glyphe + "AndroClaw" (comme l'en-tete natif)
+    font = None
+    for fp in ("/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+               "/System/Library/Fonts/Helvetica.ttc",
+               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+        try:
+            font = ImageFont.truetype(fp, 58)
+            break
+        except Exception:
+            continue
+    H2 = 104
+    glyph = art.resize((H2 - 8, H2 - 8), Image.LANCZOS)
+    if font is not None:
+        label = "AndroClaw"
+        tmp = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        tw = ImageDraw.Draw(tmp).textlength(label, font=font)
+        mark = Image.new("RGBA", (int(glyph.width + 14 + tw + 6), H2), (0, 0, 0, 0))
+        mark.paste(glyph, (0, 4), glyph)
+        ImageDraw.Draw(mark).text((glyph.width + 14, H2 // 2), label, font=font,
+                                  fill=(232, 232, 239, 255), anchor="lm")
+        mark.save(os.path.join(WEB, "logo_with_text.png"))
+    else:
+        mark = Image.new("RGBA", (500, H2), (0, 0, 0, 0))
+        g = glyph.resize((H2 - 8, H2 - 8), Image.LANCZOS)
+        mark.paste(g, (0, 4), g)
+        mark.save(os.path.join(WEB, "logo_with_text.png"))
+
+    # favicons / icones PWA (glyphe blanc sur fond app)
+    on_bg_square(art, 180, 0.80).save(os.path.join(WEB, "apple-touch-icon.png"))
+    on_bg_square(art, 96, 0.80).save(os.path.join(WEB, "favicon-96x96.png"))
+    on_bg_square(art, 192, 0.62).save(os.path.join(WEB, "web-app-manifest-192x192.png"))
+    on_bg_square(art, 512, 0.62).save(os.path.join(WEB, "web-app-manifest-512x512.png"))
+    ico = [on_bg_square(art, s, 0.80) for s in (16, 32, 48)]
+    ico[0].save(os.path.join(WEB, "favicon.ico"), sizes=[(s, s) for s in (16, 32, 48)])
+
+    # favicon.svg : PNG embarque (auto-suffisant, evite le logo upstream)
+    import base64
+    import io
+    buf = io.BytesIO()
+    on_bg_square(art, 64, 0.80).save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    with open(os.path.join(WEB, "favicon.svg"), "w") as fh:
+        fh.write(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+            '<image width="64" height="64" href="data:image/png;base64,%s"/></svg>\n' % b64)
+
+    import json
+    with open(os.path.join(WEB, "site.webmanifest"), "w") as fh:
+        json.dump({
+            "name": "AndroClaw",
+            "short_name": "AndroClaw",
+            "icons": [
+                {"src": "/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+                {"src": "/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+            ],
+            "theme_color": "#0A0A0E",
+            "background_color": "#0A0A0E",
+            "display": "standalone",
+        }, fh, indent=2)
+        fh.write("\n")
+    print("ecrit: web/frontend/public (logo_with_text, favicons, webmanifest)")

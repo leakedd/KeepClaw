@@ -4,6 +4,13 @@
 
     <!-- Etat affiche dans la pastille -->
     <string name="status_idle">arrêté</string>
+    <string name="agent_working">travaille…</string>
+    <string name="agent_idle">prêt</string>
+    <string name="agent_off">hors ligne</string>
+    <string name="notif_working">Agent · travaille…</string>
+    <string name="notif_idle">Agent · prêt</string>
+    <string name="notif_gateway_off">Gateway arrêté</string>
+    <string name="notif_starting">Démarrage…</string>
 
     <!-- Ligne secondaire sous le nom -->
     <string name="detail_offline">moteur hors ligne</string>
@@ -25,12 +32,20 @@
     <string name="lbl_reload">Recharger</string>
     <string name="lbl_battery">Batterie</string>
     <string name="lbl_wipe">Effacer</string>
+    <string name="lbl_more">Plus</string>
+    <string name="menu_start">Démarrer le moteur</string>
+    <string name="menu_stop">Arrêter le moteur</string>
+    <string name="menu_reload">Recharger la console</string>
+    <string name="menu_battery">Exemption batterie</string>
+    <string name="menu_wipe">Réinitialiser AndroClaw…</string>
     <string name="btn_wipe">Réinitialiser AndroClaw</string>
 
     <string name="wipe_title">Réinitialiser AndroClaw ?</string>
     <string name="wipe_msg">Tout effacer : mot de passe de la console, clés d\'API, canaux, conversations et carnet du moteur. La console repartira en première ouverture.</string>
     <string name="wipe_ok">Tout effacer</string>
     <string name="wipe_cancel">Annuler</string>
+
+    <string name="attach_pick">Choisir une image</string>
 
     <string name="notif_title">AndroClaw</string>
     <string name="notif_stop">Arrêter</string>

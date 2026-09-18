@@ -42,6 +42,33 @@ GO_RULES = [
     ("~/.picoclaw", "~/.androclaw"),
     ('".picoclaw/config', '".androclaw/config'),
     (".picoclaw/workspace", ".androclaw/workspace"),
+    ("# picoclaw \U0001F99E", "# AndroClaw"),
+    ("Core picoclaw identity", "Core AndroClaw identity"),
+    ("picoclaw identity", "androclaw identity"),
+    ("Run: picoclaw auth login", "Run: androclaw auth login"),
+    ("process is not picoclaw", "process is not androclaw"),
+    ("via picoclaw CLI", "via androclaw CLI"),
+    ("picoclaw-workspace", "androclaw-workspace"),
+    ("picoclaw --version", "androclaw --version"),
+    (r"""	banner    = "\r\n" +
+		colorBlue + "██████╗ ██╗ ██████╗ ██████╗ " + colorRed + " ██████╗██╗      █████╗ ██╗    ██╗\n" +
+		colorBlue + "██╔══██╗██║██╔════╝██╔═══██╗" + colorRed + "██╔════╝██║     ██╔══██╗██║    ██║\n" +
+		colorBlue + "██████╔╝██║██║     ██║   ██║" + colorRed + "██║     ██║     ███████║██║ █╗ ██║\n" +
+		colorBlue + "██╔═══╝ ██║██║     ██║   ██║" + colorRed + "██║     ██║     ██╔══██║██║███╗██║\n" +
+		colorBlue + "██║     ██║╚██████╗╚██████╔╝" + colorRed + "╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
+		colorBlue + "╚═╝     ╚═╝ ╚═════╝ ╚═════╝ " + colorRed + " ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
+		"\033[0m\r\n"
+	plainBanner = "\r\n" +
+		"██████╗ ██╗ ██████╗ ██████╗  ██████╗██╗      █████╗ ██╗    ██╗\n" +
+		"██╔══██╗██║██╔════╝██╔═══██╗██╔════╝██║     ██╔══██╗██║    ██║\n" +
+		"██████╔╝██║██║     ██║   ██║██║     ██║     ███████║██║ █╗ ██║\n" +
+		"██╔═══╝ ██║██║     ██║   ██║██║     ██║     ██╔══██║██║███╗██║\n" +
+		"██║     ██║╚██████╗╚██████╔╝╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
+		"╚═╝     ╚═╝ ╚═════╝ ╚═════╝  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
+		"\r\n"
+""", r"""	banner    = "\r\n" + colorBlue + "  AndroClaw" + "\033[0m" + colorRed + "  \u00b7  agent gateway" + "\033[0m\r\n\r\n"
+	plainBanner = "\r\n  AndroClaw \u00b7 agent gateway\r\n\r\n"
+"""),
 ]
 
 # --- remplacements appliques a la console web (tsx/ts/html/json d'i18n) ---------

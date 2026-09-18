@@ -9,9 +9,13 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -30,6 +34,59 @@ public class MainActivity extends Activity {
     private TextView detail;
     private View dot;
     private View loading;
+    private ValueCallback<Uri[]> filePathCallback;
+    private static final int REQ_FILE_CHOOSER = 100;
+    private boolean chatFullscreen = false;
+
+    /** Pont JS <-> natif : la console demande le plein écran du chat (masquer l'en-tête
+     *  Android + barres système), pour discuter sans chrome autour. */
+    private class ShellBridge {
+        @android.webkit.JavascriptInterface
+        public void setFullscreen(final boolean on) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { applyChatFullscreen(on); }
+            });
+        }
+    }
+
+    private void applyChatFullscreen(boolean on) {
+        chatFullscreen = on;
+        View header = findViewById(R.id.header);
+        View divider = findViewById(R.id.header_divider);
+        header.setVisibility(on ? View.GONE : View.VISIBLE);
+        divider.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsetsController c = getWindow().getInsetsController();
+            if (c != null) {
+                if (on) {
+                    c.hide(android.view.WindowInsets.Type.statusBars()
+                            | android.view.WindowInsets.Type.navigationBars());
+                    c.setSystemBarsBehavior(
+                            android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                } else {
+                    c.show(android.view.WindowInsets.Type.statusBars()
+                            | android.view.WindowInsets.Type.navigationBars());
+                }
+            }
+        } else {
+            View decor = getWindow().getDecorView();
+            decor.setSystemUiVisibility(on
+                    ? (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
+                       | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                       | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
+                    : View.SYSTEM_UI_FLAG_VISIBLE);
+        }
+    }
+
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private boolean polling = false;
+
+    private final Runnable pollAgent = new Runnable() {
+        @Override public void run() {
+            refreshAgentState();
+            if (polling) ui.postDelayed(this, 2000);
+        }
+    };
 
     /** Touche de finition appliquee a la console web : barres de defilement fines,
      *  selection teintee, fond identique au shell. Idempotent. */
@@ -61,8 +118,15 @@ public class MainActivity extends Activity {
         root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
             @Override public android.view.WindowInsets onApplyWindowInsets(View v, android.view.WindowInsets insets) {
                 if (Build.VERSION.SDK_INT >= 30) {
-                    android.graphics.Insets b = insets.getInsets(android.view.WindowInsets.Type.systemBars());
-                    v.setPadding(b.left, b.top, b.right, b.bottom);
+                    // Barres système + encoche, et surtout le clavier (ime) : sur Android 15+
+                    // edge-to-edge, adjustResize ne redimensionne plus la fenêtre — c'est à
+                    // l'app de réserver l'espace du clavier, sinon le champ de saisie du chat
+                    // passe dessous.
+                    android.graphics.Insets b = insets.getInsets(
+                            android.view.WindowInsets.Type.systemBars()
+                                    | android.view.WindowInsets.Type.displayCutout());
+                    android.graphics.Insets ime = insets.getInsets(android.view.WindowInsets.Type.ime());
+                    v.setPadding(b.left, b.top, b.right, Math.max(b.bottom, ime.bottom));
                 } else {
                     v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
                             insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
@@ -87,28 +151,74 @@ public class MainActivity extends Activity {
                 loading.setVisibility(View.GONE);
                 v.evaluateJavascript(CONSOLE_SKIN, null);
             }
+
+            /** La console est locale : tout lien externe (docs, GitHub, marketplace) part
+             *  dans le navigateur système au lieu de remplacer la console dans la WebView. */
+            @Override public boolean shouldOverrideUrlLoading(WebView v, android.webkit.WebResourceRequest req) {
+                Uri u = req.getUrl();
+                String host = u.getHost();
+                if (host != null && (host.equals("127.0.0.1") || host.equals("localhost"))) {
+                    return false;
+                }
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, u));
+                } catch (Exception ignored) { }
+                return true;
+            }
+        });
+
+        // Pièces jointes : le chat (et l'installation de skills) utilisent <input type="file">.
+        // Sans WebChromeClient.onShowFileChooser, le sélecteur ne s'ouvre jamais.
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb,
+                                                       FileChooserParams params) {
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = cb;
+                try {
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    String[] accept = params.getAcceptTypes();
+                    if (accept != null && accept.length > 0 && accept[0] != null && !accept[0].isEmpty()) {
+                        i.setType(accept[0]);
+                    } else {
+                        i.setType("*/*");
+                    }
+                    i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
+                            params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                    startActivityForResult(Intent.createChooser(i, getString(R.string.attach_pick)),
+                            REQ_FILE_CHOOSER);
+                    return true;
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    return false;
+                }
+            }
         });
         web.setBackgroundColor(0xFF0A0A0E);
+        web.addJavascriptInterface(new ShellBridge(), "AndroidShell");
         setState(R.color.muted, R.string.status_idle, null);
 
-        findViewById(R.id.btn_start).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startCore(); }
-        });
-        findViewById(R.id.btn_stop).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { stopCore(); }
-        });
-        findViewById(R.id.btn_reload).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { waitAndLoad(); }
-        });
-        findViewById(R.id.btn_battery).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { requestBatteryExemption(); }
-        });
-        findViewById(R.id.btn_wipe).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { confirmWipe(); }
+        findViewById(R.id.btn_menu).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showMoreMenu(v); }
         });
 
         askNotifications();
+        maybeAskBatteryExemption();
         startCore();
+    }
+
+    /** Au tout premier lancement : demande l'exemption d'optimisation batterie.
+     *  Sans elle, Android peut geler/tuer le service en arrière-plan et le gateway
+     *  devient injoignable dès que l'écran est éteint. Une seule fois (mémorisé). */
+    private void maybeAskBatteryExemption() {
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        if (prefs.getBoolean("asked_battery", false)) return;
+        prefs.edit().putBoolean("asked_battery", true).apply();
+        ui.postDelayed(new Runnable() {
+            @Override public void run() { requestBatteryExemption(); }
+        }, 1500);
     }
 
     /**
@@ -231,9 +341,104 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Toutes les actions du shell (moteur + maintenance) dans un menu ⋯ compact. */
+    private void showMoreMenu(View anchor) {
+        android.widget.PopupMenu m = new android.widget.PopupMenu(this, anchor);
+        m.getMenu().add(0, 1, 0, R.string.menu_start);
+        m.getMenu().add(0, 2, 1, R.string.menu_stop);
+        m.getMenu().add(0, 3, 2, R.string.menu_reload);
+        m.getMenu().add(0, 4, 3, R.string.menu_battery);
+        m.getMenu().add(0, 5, 4, R.string.menu_wipe);
+        m.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
+            @Override public boolean onMenuItemClick(android.view.MenuItem item) {
+                if (item.getItemId() == 1) { startCore(); return true; }
+                if (item.getItemId() == 2) { stopCore(); return true; }
+                if (item.getItemId() == 3) { waitAndLoad(); return true; }
+                if (item.getItemId() == 4) { requestBatteryExemption(); return true; }
+                if (item.getItemId() == 5) { confirmWipe(); return true; }
+                return false;
+            }
+        });
+        m.show();
+    }
+
+    /**
+     * Reflète en direct l'état de l'agent (travaille / prêt / hors ligne) et le modèle
+     * actif, tels que suivis par le service (qui alimente aussi la notification).
+     */
+    private void refreshAgentState() {
+        if (status == null || loading == null || loading.getVisibility() == View.VISIBLE) return;
+        String agent = CoreService.agent();
+        String model = CoreService.model();
+        int color;
+        int label;
+        if ("working".equals(agent)) {
+            color = R.color.ok;
+            label = R.string.agent_working;
+        } else if ("idle".equals(agent)) {
+            color = R.color.ok;
+            label = R.string.agent_idle;
+        } else if (CoreService.isRunning()) {
+            color = R.color.warn;
+            label = R.string.agent_off;
+        } else {
+            color = R.color.muted;
+            label = R.string.status_idle;
+        }
+        status.setText(label);
+        dot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(color, getTheme())));
+        String host = CoreService.BASE.replace("http://", "");
+        detail.setText((model == null || model.isEmpty()) ? host : model + " · " + host);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        polling = true;
+        ui.post(pollAgent);
+    }
+
+    @Override
+    protected void onPause() {
+        polling = false;
+        ui.removeCallbacks(pollAgent);
+        super.onPause();
+    }
+
     @Override
     public void onBackPressed() {
+        if (chatFullscreen) {
+            // Retour = sortir du plein écran (et prévenir la console).
+            web.evaluateJavascript("window.__acSetFullscreen && window.__acSetFullscreen(false)", null);
+            applyChatFullscreen(false);
+            return;
+        }
         if (web != null && web.canGoBack()) web.goBack();
         else super.onBackPressed();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_FILE_CHOOSER) {
+            Uri[] results = null;
+            if (resultCode == RESULT_OK && data != null) {
+                if (data.getClipData() != null) {
+                    int count = data.getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
+                    }
+                } else if (data.getData() != null) {
+                    results = new Uri[]{ data.getData() };
+                }
+            }
+            if (filePathCallback != null) {
+                filePathCallback.onReceiveValue(results);
+                filePathCallback = null;
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }
