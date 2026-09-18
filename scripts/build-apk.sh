@@ -18,6 +18,21 @@ if [ ! -f app/src/main/jniLibs/arm64-v8a/libcore.so ] || [ ! -f app/src/main/jni
 fi
 
 TASK="${1:-assembleRelease}"
+
+# Garde-fou produit : une install fraiche ne doit proposer AUCUN modele.
+# Le seed embarque donc une model_list vide — les modeles n'apparaissent qu'apres
+# la saisie d'une cle dans l'onglet Providers (fetch -> ajout en masse).
+python3 - "$ROOT/app/src/main/assets/seed/config.json" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))
+n = len(cfg.get("model_list") or [])
+if n:
+    sys.exit("seed: %d modele(s) preconfigure(s) -> une install fraiche les afficherait "
+             "(dont azure/local en 'available'/'unreachable'). Vider model_list dans "
+             "app/src/main/assets/seed/config.json avant de builder." % n)
+print("seed ok : 0 modele preconfigure, model_name=%r" % cfg["agents"]["defaults"]["model_name"])
+PY
+
 echo "== gradle $TASK =="
 ./gradlew --no-daemon "$TASK" 2>&1 | tail -25
 

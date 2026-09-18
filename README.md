@@ -57,8 +57,8 @@ adb install -r KeepClaw-0.1.0-release.apk
 Verify what you downloaded before installing:
 
 ```
-APK   47013f9c91904bf060ac1791d64df4bc0ebdc550e58f2a6bb737fe1199c52d4b
-SRC   38ec6b46d54a4a574ee3a2365720f19b6fd52acb2fc9ead04fa8c0268ebbf640
+APK   ce003401cacee541c928ecf625dcc43350bffac6adaaecfe9640f71c198743c8
+SRC   5b88f980db56fbb24c580008aee4e8a278548232ac1b842741ea9247ae43368d
 ```
 
 ```bash

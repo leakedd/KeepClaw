@@ -384,7 +384,8 @@ public class CoreService extends Service {
         }
     }
 
-    /** Première exécution : copie le config.json d'exemple (modèles + en-têtes opencode-go). */
+    /** Première exécution : copie le config.json d'exemple (squelette vide, AUCUN modèle —
+     *  ils n'apparaissent qu'après la saisie d'une clé dans l'onglet Providers). */
     private void seedIfEmpty(File home) {
         File cfg = new File(home, "config.json");
         if (cfg.exists()) return;
