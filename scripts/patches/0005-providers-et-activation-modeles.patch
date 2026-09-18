@@ -221,7 +221,7 @@
 +		t.Fatal("config signature should change when an API key changes")
 +	}
 +
-+	cfg.ModelList[0].CustomHeaders = map[string]string{"x-opencode-session": "androclaw"}
++	cfg.ModelList[0].CustomHeaders = map[string]string{"x-opencode-session": "keepclaw"}
 +	withHeaders := computeConfigSignature(cfg)
 +	if withHeaders == withKey {
 +		t.Fatal("config signature should change when custom headers change")

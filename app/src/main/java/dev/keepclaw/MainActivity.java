@@ -1,4 +1,4 @@
-package dev.androclaw;
+package dev.keepclaw;
 
 import android.Manifest;
 import android.app.Activity;
@@ -24,7 +24,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * L'UI d'AndroClaw = la console web (moteur + console Go) dans une WebView locale,
+ * L'UI de KeepClaw = la console web (moteur + console Go) dans une WebView locale,
  * plus une barre de contrôle minimale (démarrer / arrêter / recharger / exemption batterie).
  */
 public class MainActivity extends Activity {
@@ -242,7 +242,7 @@ public class MainActivity extends Activity {
     private void stopCore() {
         startService(new Intent(this, CoreService.class).setAction(CoreService.ACTION_STOP));
         setState(R.color.muted, R.string.state_stopped, null);
-        Toast.makeText(this, "AndroClaw arrêté", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "KeepClaw arrêté", Toast.LENGTH_SHORT).show();
     }
 
     /** Attend que le port 18800 réponde (max ~40 s) puis charge la console. */
@@ -308,7 +308,7 @@ public class MainActivity extends Activity {
                 });
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        Toast.makeText(MainActivity.this, "AndroClaw réinitialisé", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "KeepClaw réinitialisé", Toast.LENGTH_SHORT).show();
                     }
                 });
             }

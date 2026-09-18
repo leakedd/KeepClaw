@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AndroClaw — build de l'APK (release signée) + installation sur l'appareil connecté.
+# KeepClaw — build de l'APK (release signée) + installation sur l'appareil connecté.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21

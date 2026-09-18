@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AndroClaw — applique les correctifs UI mobiles au sous-module picoclaw.
+# KeepClaw — applique les correctifs UI mobiles au sous-module picoclaw.
 #
 # Le sous-module reste epingle sur son commit upstream : nos correctifs sont des
 # patches versionnes (scripts/patches/*.patch), appliques par ce script, comme le

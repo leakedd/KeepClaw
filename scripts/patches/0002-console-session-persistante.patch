@@ -12,7 +12,7 @@
 +// loadOrCreateDashboardSession returns a stable dashboard session cookie value.
 +//
 +// Upstream generates a random token per process, so every service restart (reboot,
-+// app update, crash) invalidated the browser cookie and forced a re-login. AndroClaw
++// app update, crash) invalidated the browser cookie and forced a re-login. KeepClaw
 +// runs the console as an always-on appliance (VPN-like), so we persist the token in
 +// the app-private home and reuse it until the user logs out.
 +func loadOrCreateDashboardSession(picoHome string) (string, error) {

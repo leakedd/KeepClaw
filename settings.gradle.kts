@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AndroClaw"
+rootProject.name = "KeepClaw"
 include(":app")

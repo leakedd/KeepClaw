@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AndroClaw — boucle de dev sur macOS.
+# KeepClaw — boucle de dev sur macOS.
 #
 # Compile le moteur + la console pour darwin (même code, même branding que l'APK)
 # et sert la console en local, pour itérer sur l'UI sans passer par le téléphone.
@@ -36,7 +36,7 @@ echo "== binaires darwin =="
 
 echo "== console : http://127.0.0.1:$PORT =="
 cd "$OUT"
-ANDROCLAW_HOME="$OUT/home" \
-ANDROCLAW_BINARY="$OUT/ac-core" \
-ANDROCLAW_LAUNCHER_HOST="127.0.0.1" \
+KEEPCLAW_HOME="$OUT/home" \
+KEEPCLAW_BINARY="$OUT/ac-core" \
+KEEPCLAW_LAUNCHER_HOST="127.0.0.1" \
 exec "$OUT/ac-console" -host 127.0.0.1 -port "$PORT"

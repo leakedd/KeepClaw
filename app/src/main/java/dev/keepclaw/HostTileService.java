@@ -1,4 +1,4 @@
-package dev.androclaw;
+package dev.keepclaw;
 
 import android.content.Intent;
 import android.graphics.drawable.Icon;
@@ -7,7 +7,7 @@ import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 
 /**
- * Tuile « AndroClaw » du volet rapide : une slide, un tap = démarrage ou coupure immédiate.
+ * Tuile « KeepClaw » du volet rapide : une slide, un tap = démarrage ou coupure immédiate.
  */
 public class HostTileService extends TileService {
 
@@ -42,7 +42,7 @@ public class HostTileService extends TileService {
         if (t == null) return;
         boolean on = CoreService.isRunning();
         t.setState(on ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
-        t.setLabel("AndroClaw");
+        t.setLabel("KeepClaw");
         if (Build.VERSION.SDK_INT >= 29) {
             t.setSubtitle(on ? "gateway actif" : "arrêté");
         }

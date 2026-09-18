@@ -2,7 +2,7 @@
 <resources>
     <color name="ic_launcher_background">#0A0A0E</color>
 
-    <!-- Palette sombre d'AndroClaw -->
+    <!-- Palette sombre de KeepClaw -->
     <color name="bg">#FF0A0A0E</color>
     <color name="bg_header">#FF0F0F14</color>
     <color name="surface">#FF15151C</color>

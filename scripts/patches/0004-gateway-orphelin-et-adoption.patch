@@ -453,7 +453,7 @@
  	originalRestartForceKillWindow := gatewayRestartForceKillWindow
  	originalRestartPollInterval := gatewayRestartPollInterval
 +	originalPortProbe := gatewayPortProbe
- 	t.Setenv("ANDROCLAW_HOME", t.TempDir())
+ 	t.Setenv("KEEPCLAW_HOME", t.TempDir())
  	t.Cleanup(func() {
  		gatewayHealthGet = originalHealthGet
 @@ -109,6 +111,7 @@

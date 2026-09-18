@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AndroClaw</string>
+    <string name="app_name">KeepClaw</string>
 
     <!-- Etat affiche dans la pastille -->
     <string name="status_idle">arrêté</string>
@@ -37,16 +37,16 @@
     <string name="menu_stop">Arrêter le moteur</string>
     <string name="menu_reload">Recharger la console</string>
     <string name="menu_battery">Exemption batterie</string>
-    <string name="menu_wipe">Réinitialiser AndroClaw…</string>
-    <string name="btn_wipe">Réinitialiser AndroClaw</string>
+    <string name="menu_wipe">Réinitialiser KeepClaw…</string>
+    <string name="btn_wipe">Réinitialiser KeepClaw</string>
 
-    <string name="wipe_title">Réinitialiser AndroClaw ?</string>
+    <string name="wipe_title">Réinitialiser KeepClaw ?</string>
     <string name="wipe_msg">Tout effacer : mot de passe de la console, clés d\'API, canaux, conversations et carnet du moteur. La console repartira en première ouverture.</string>
     <string name="wipe_ok">Tout effacer</string>
     <string name="wipe_cancel">Annuler</string>
 
     <string name="attach_pick">Choisir une image</string>
 
-    <string name="notif_title">AndroClaw</string>
+    <string name="notif_title">KeepClaw</string>
     <string name="notif_stop">Arrêter</string>
 </resources>

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# AndroClaw — boucle de dev émulateur : boot → build → install → lancement → logs.
+# KeepClaw — boucle de dev émulateur : boot → build → install → lancement → logs.
 # Usage : scripts/dev-emulator.sh [boot|build|install|launch|logs|all]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$HOME/Library/Android/sdk/platform-tools:$HOME/Library/Android/sdk/emulator:$PATH"
 SERIAL="${SERIAL:-emulator-5554}"
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
-PKG="dev.androclaw.debug"
-ACTIVITY="$PKG/dev.androclaw.MainActivity"
+PKG="dev.keepclaw.debug"
+ACTIVITY="$PKG/dev.keepclaw.MainActivity"
 CMD="${1:-all}"
 
 wait_boot() {
@@ -21,7 +21,7 @@ wait_boot() {
 case "$CMD" in
   boot)
     if ! adb devices | grep -q "^$SERIAL"; then
-      nohup emulator -avd androclaw -no-audio -no-boot-anim -gpu auto -no-snapshot >/tmp/ac-emu.log 2>&1 &
+      nohup emulator -avd keepclaw -no-audio -no-boot-anim -gpu auto -no-snapshot >/tmp/ac-emu.log 2>&1 &
     fi
     wait_boot
     ;;
@@ -38,7 +38,7 @@ case "$CMD" in
     echo "console : http://127.0.0.1:18800 (login = mot de passe console)"
     ;;
   logs)
-    adb -s "$SERIAL" logcat -v time | grep -iE "AndroClaw|libcore|libconsole|go:"
+    adb -s "$SERIAL" logcat -v time | grep -iE "KeepClaw|libcore|libconsole|go:"
     ;;
   all)
     "$0" boot

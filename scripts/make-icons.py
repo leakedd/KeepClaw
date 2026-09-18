@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Genere les ressources d'icones d'AndroClaw depuis assets/logo-source.png.
+"""Genere les ressources d'icones de KeepClaw depuis assets/logo-source.png.
 
 Le logo officiel est un glyphe BLANC sur fond NOIR opaque. On rend transparent le
 seul fond EXTERIEUR (le noir relie aux bords de l'image), ce qui conserve intactes
@@ -115,7 +115,7 @@ if os.path.isdir(WEB):
             c.putalpha(mask)
         return c
 
-    # wordmark : glyphe + "AndroClaw" (comme l'en-tete natif)
+    # wordmark : glyphe + "KeepClaw" (comme l'en-tete natif)
     font = None
     for fp in ("/System/Library/Fonts/Supplemental/Arial Bold.ttf",
                "/System/Library/Fonts/Helvetica.ttc",
@@ -128,7 +128,7 @@ if os.path.isdir(WEB):
     H2 = 104
     glyph = art.resize((H2 - 8, H2 - 8), Image.LANCZOS)
     if font is not None:
-        label = "AndroClaw"
+        label = "KeepClaw"
         tmp = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
         tw = ImageDraw.Draw(tmp).textlength(label, font=font)
         mark = Image.new("RGBA", (int(glyph.width + 14 + tw + 6), H2), (0, 0, 0, 0))
@@ -164,8 +164,8 @@ if os.path.isdir(WEB):
     import json
     with open(os.path.join(WEB, "site.webmanifest"), "w") as fh:
         json.dump({
-            "name": "AndroClaw",
-            "short_name": "AndroClaw",
+            "name": "KeepClaw",
+            "short_name": "KeepClaw",
             "icons": [
                 {"src": "/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
                 {"src": "/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},

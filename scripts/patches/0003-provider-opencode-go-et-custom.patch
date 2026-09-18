@@ -27,7 +27,7 @@
 +		Priority:            45,
 +		CommonModels:        []string{"mimo-v2.5", "deepseek-v4.1-flash", "kimi-k3", "glm-5.3"},
 +		Aliases:             []string{"opencode-zen"},
-+		DefaultHeaders:      map[string]string{"x-opencode-session": "androclaw"},
++		DefaultHeaders:      map[string]string{"x-opencode-session": "keepclaw"},
 +		httpAPI:             true,
 +	},
 +	"custom": {
@@ -101,7 +101,7 @@
 +
  	userAgent := cfg.UserAgent
  	if userAgent == "" {
- 		userAgent = fmt.Sprintf("AndroClaw/%s", config.Version)
+ 		userAgent = fmt.Sprintf("KeepClaw/%s", config.Version)
 @@ -203,11 +229,15 @@
  	case "litellm", "lmstudio", "gpt4free", "openrouter", "groq", "zhipu", "nvidia", "venice",
  		"nearai", "ollama", "moonshot", "shengsuanyun", "siliconflow", "deepseek", "cerebras",

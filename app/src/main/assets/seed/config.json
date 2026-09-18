@@ -60,7 +60,7 @@
       },
       "settings": {
         "email": "@nine.testrun.org",
-        "display_name": "AndroClaw Bot"
+        "display_name": "KeepClaw Bot"
       }
     },
     "dingtalk": {
@@ -117,7 +117,7 @@
       "settings": {
         "server": "",
         "tls": true,
-        "nick": "androclaw",
+        "nick": "keepclaw",
         "sasl_user": "",
         "channels": []
       }

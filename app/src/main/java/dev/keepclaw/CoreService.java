@@ -1,4 +1,4 @@
-package dev.androclaw;
+package dev.keepclaw;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -31,26 +31,26 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AndroClaw — héberge le moteur + la console web dans un foreground service
+ * KeepClaw — héberge le moteur + la console web dans un foreground service
  * « façon VPN/Spotify » : notification permanente, redémarrage START_STICKY, arrêt manuel
  * depuis la notification (visible sur l'écran verrouillé) ou depuis la tuile du volet rapide.
  *
  * Deux binaires Go sont embarqués dans jniLibs (extraits par PackageManager dans
  * nativeLibraryDir, la seule zone exec-able pour une app targetSdk >= 29) :
  *   libconsole.so  -> console (serveur web + spawn du moteur)          port 18800
- *   libcore.so  -> moteur (agent + gateway), passé via ANDROCLAW_BINARY
+ *   libcore.so  -> moteur (agent + gateway), passé via KEEPCLAW_BINARY
  */
 public class CoreService extends Service {
 
-    public static final String ACTION_START  = "dev.androclaw.action.START";
-    public static final String ACTION_STOP   = "dev.androclaw.action.STOP";
-    public static final String ACTION_TOGGLE = "dev.androclaw.action.TOGGLE";
+    public static final String ACTION_START  = "dev.keepclaw.action.START";
+    public static final String ACTION_STOP   = "dev.keepclaw.action.STOP";
+    public static final String ACTION_TOGGLE = "dev.keepclaw.action.TOGGLE";
 
     public static final int    PORT = 18800;
     public static final String BASE = "http://127.0.0.1:" + PORT;
 
-    private static final String TAG    = "AndroClaw";
-    private static final String CH_ID  = "androclaw";
+    private static final String TAG    = "KeepClaw";
+    private static final String CH_ID  = "keepclaw";
     private static final int    NOTIF  = 4711;
 
     private static volatile boolean sRunning = false;
@@ -145,10 +145,10 @@ public class CoreService extends Service {
                     pb.redirectErrorStream(true);
                     final Map<String, String> env = pb.environment();
                     env.put("HOME", getFilesDir().getAbsolutePath());
-                    env.put("ANDROCLAW_HOME", home.getAbsolutePath());
-                    env.put("ANDROCLAW_BINARY", core.getAbsolutePath());
-                    env.put("ANDROCLAW_BUILTIN_SKILLS", new File(getFilesDir(), "skills").getAbsolutePath());
-                    env.put("ANDROCLAW_LAUNCHER_HOST", "127.0.0.1");
+                    env.put("KEEPCLAW_HOME", home.getAbsolutePath());
+                    env.put("KEEPCLAW_BINARY", core.getAbsolutePath());
+                    env.put("KEEPCLAW_BUILTIN_SKILLS", new File(getFilesDir(), "skills").getAbsolutePath());
+                    env.put("KEEPCLAW_LAUNCHER_HOST", "127.0.0.1");
                     env.put("TMPDIR", getCacheDir().getAbsolutePath());
                     env.put("PATH", "/system/bin:/system/xbin");
 
@@ -189,7 +189,7 @@ public class CoreService extends Service {
                         startStatusLoop();
                     } else {
                         setState("démarrage lent — voir journal");
-                        goForeground("AndroClaw · démarrage lent");
+                        goForeground("KeepClaw · démarrage lent");
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "startCore a échoué", e);
@@ -240,7 +240,7 @@ public class CoreService extends Service {
         // ancien emplacement (avant le renommage) : purge pour que la réinitialisation soit complète
         deleteTree(new File(ctx.getFilesDir(), "picoclaw"));
         // et le dossier historique du moteur (skills / sessions)
-        deleteTree(new File(ctx.getFilesDir(), ".androclaw"));
+        deleteTree(new File(ctx.getFilesDir(), ".keepclaw"));
         deleteTree(new File(ctx.getFilesDir(), ".picoclaw"));
 
         try {
@@ -472,9 +472,9 @@ public class CoreService extends Service {
     private void createChannel() {
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm == null) return;
-        NotificationChannel ch = new NotificationChannel(CH_ID, "Gateway AndroClaw",
+        NotificationChannel ch = new NotificationChannel(CH_ID, "Gateway KeepClaw",
                 NotificationManager.IMPORTANCE_LOW);
-        ch.setDescription("Statut du moteur hébergé par AndroClaw");
+        ch.setDescription("Statut du moteur hébergé par KeepClaw");
         ch.setShowBadge(false);
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
@@ -494,7 +494,7 @@ public class CoreService extends Service {
 
         Notification.Builder b = new Notification.Builder(this, CH_ID)
                 .setSmallIcon(R.drawable.ic_stat_core)
-                .setContentTitle("AndroClaw")
+                .setContentTitle("KeepClaw")
                 .setContentText(text)
                 .setContentIntent(pi)
                 .addAction(stopAction)

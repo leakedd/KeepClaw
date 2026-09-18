@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AndroClaw — export des artefacts : APK release signé + archive source + sommes de contrôle.
+# KeepClaw — export des artefacts : APK release signé + archive source + sommes de contrôle.
 # Usage : ./scripts/export.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,7 +17,7 @@ if [ -z "$APK" ]; then
   echo "aucun APK release : lance d'abord ./scripts/build-apk.sh assembleRelease" >&2
   exit 1
 fi
-OUT="$DIST/AndroClaw-$VER-release.apk"
+OUT="$DIST/KeepClaw-$VER-release.apk"
 cp "$APK" "$OUT"
 
 APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)"
@@ -29,7 +29,7 @@ else
 fi
 
 echo "== archive source =="
-git archive --format=tar.gz --prefix="AndroClaw-$VER/" -o "$DIST/AndroClaw-$VER-source.tar.gz" HEAD
+git archive --format=tar.gz --prefix="KeepClaw-$VER/" -o "$DIST/KeepClaw-$VER-source.tar.gz" HEAD
 
 cd "$DIST"
 shasum -a 256 ./*.apk ./*.tar.gz > SHA256SUMS.txt

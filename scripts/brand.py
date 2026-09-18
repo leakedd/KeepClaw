@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""AndroClaw — branding.
+"""KeepClaw — branding.
 
-Applique notre marque (AndroClaw) sur les sources du sous-module picoclaw, puis
+Applique notre marque (KeepClaw) sur les sources du sous-module picoclaw, puis
 recompile : le sous-module reste épinglé sur son commit upstream, notre branding
 est explicite, versionné et reproductible.
 
@@ -25,31 +25,31 @@ SUBMODULE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "nati
 
 # --- remplacements appliques aux fichiers Go (jamais d'import path) -------------
 GO_RULES = [
-    ('"https://docs.picoclaw.io/docs/"', '"https://github.com/leakedd/AndroClaw"'),
-    ('"https://docs.picoclaw.io/zh-Hans/docs/"', '"https://github.com/leakedd/AndroClaw"'),
-    ('"https://github.com/sipeed/picoclaw"', '"https://github.com/leakedd/AndroClaw"'),
-    ("PICOCLAW_", "ANDROCLAW_"),
-    ("picoclaw_launcher_auth", "androclaw_launcher_auth"),
-    ("PicoClaw", "AndroClaw"),
-    ("You are picoclaw", "You are AndroClaw"),
-    (".picoclaw_history", ".androclaw_history"),
-    (".picoclaw.pid", ".androclaw.pid"),
-    ('".picoclaw"', '".androclaw"'),
-    ('"picoclaw"', '"androclaw"'),
-    ("io.picoclaw.launcher", "io.androclaw.host"),
-    ("PicoClawLauncher", "AndroClawHost"),
-    ("PicoClaw Web", "AndroClaw Host"),
-    ("~/.picoclaw", "~/.androclaw"),
-    ('".picoclaw/config', '".androclaw/config'),
-    (".picoclaw/workspace", ".androclaw/workspace"),
-    ("# picoclaw \U0001F99E", "# AndroClaw"),
-    ("Core picoclaw identity", "Core AndroClaw identity"),
-    ("picoclaw identity", "androclaw identity"),
-    ("Run: picoclaw auth login", "Run: androclaw auth login"),
-    ("process is not picoclaw", "process is not androclaw"),
-    ("via picoclaw CLI", "via androclaw CLI"),
-    ("picoclaw-workspace", "androclaw-workspace"),
-    ("picoclaw --version", "androclaw --version"),
+    ('"https://docs.picoclaw.io/docs/"', '"https://github.com/leakedd/KeepClaw"'),
+    ('"https://docs.picoclaw.io/zh-Hans/docs/"', '"https://github.com/leakedd/KeepClaw"'),
+    ('"https://github.com/sipeed/picoclaw"', '"https://github.com/leakedd/KeepClaw"'),
+    ("PICOCLAW_", "KEEPCLAW_"),
+    ("picoclaw_launcher_auth", "keepclaw_launcher_auth"),
+    ("PicoClaw", "KeepClaw"),
+    ("You are picoclaw", "You are KeepClaw"),
+    (".picoclaw_history", ".keepclaw_history"),
+    (".picoclaw.pid", ".keepclaw.pid"),
+    ('".picoclaw"', '".keepclaw"'),
+    ('"picoclaw"', '"keepclaw"'),
+    ("io.picoclaw.launcher", "io.keepclaw.host"),
+    ("PicoClawLauncher", "KeepClawHost"),
+    ("PicoClaw Web", "KeepClaw Host"),
+    ("~/.picoclaw", "~/.keepclaw"),
+    ('".picoclaw/config', '".keepclaw/config'),
+    (".picoclaw/workspace", ".keepclaw/workspace"),
+    ("# picoclaw \U0001F99E", "# KeepClaw"),
+    ("Core picoclaw identity", "Core KeepClaw identity"),
+    ("picoclaw identity", "keepclaw identity"),
+    ("Run: picoclaw auth login", "Run: keepclaw auth login"),
+    ("process is not picoclaw", "process is not keepclaw"),
+    ("via picoclaw CLI", "via keepclaw CLI"),
+    ("picoclaw-workspace", "keepclaw-workspace"),
+    ("picoclaw --version", "keepclaw --version"),
     (r"""	banner    = "\r\n" +
 		colorBlue + "██████╗ ██╗ ██████╗ ██████╗ " + colorRed + " ██████╗██╗      █████╗ ██╗    ██╗\n" +
 		colorBlue + "██╔══██╗██║██╔════╝██╔═══██╗" + colorRed + "██╔════╝██║     ██╔══██╗██║    ██║\n" +
@@ -66,16 +66,16 @@ GO_RULES = [
 		"██║     ██║╚██████╗╚██████╔╝╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
 		"╚═╝     ╚═╝ ╚═════╝ ╚═════╝  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
 		"\r\n"
-""", r"""	banner    = "\r\n" + colorBlue + "  AndroClaw" + "\033[0m" + colorRed + "  \u00b7  agent gateway" + "\033[0m\r\n\r\n"
-	plainBanner = "\r\n  AndroClaw \u00b7 agent gateway\r\n\r\n"
+""", r"""	banner    = "\r\n" + colorBlue + "  KeepClaw" + "\033[0m" + colorRed + "  \u00b7  agent gateway" + "\033[0m\r\n\r\n"
+	plainBanner = "\r\n  KeepClaw \u00b7 agent gateway\r\n\r\n"
 """),
 ]
 
 # --- remplacements appliques a la console web (tsx/ts/html/json d'i18n) ---------
 WEB_RULES = [
-    ("https://docs.picoclaw.io", "https://github.com/leakedd/AndroClaw"),
-    ("PicoClaw", "AndroClaw"),
-    ("picoclaw", "androclaw"),
+    ("https://docs.picoclaw.io", "https://github.com/leakedd/KeepClaw"),
+    ("PicoClaw", "KeepClaw"),
+    ("picoclaw", "keepclaw"),
 ]
 
 # Neutralisation de l'endpoint de mise a jour upstream.

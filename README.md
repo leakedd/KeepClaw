@@ -1,15 +1,15 @@
-# AndroClaw
+# KeepClaw
 
 **Android host for [picoclaw](https://github.com/sipeed/picoclaw): the agent gateway and its local web console
 run inside a foreground service — persistently, like a VPN or a music player. No Termux, no root, no ADB in
 daily use.**
 
 <p align="center">
-  <a href="https://github.com/leakedd/AndroClaw/releases/download/v0.1.0/AndroClaw-0.1.0-release.apk">
+  <a href="https://github.com/leakedd/KeepClaw/releases/download/v0.1.0/KeepClaw-0.1.0-release.apk">
     <img alt="Download the APK" src="https://img.shields.io/badge/DOWNLOAD_APK-60_MB_%C2%B7_arm64--v8a-2ea44f?style=for-the-badge&logo=android&logoColor=white" height="44">
   </a>
   &nbsp;
-  <a href="https://github.com/leakedd/AndroClaw/releases/latest">
+  <a href="https://github.com/leakedd/KeepClaw/releases/latest">
     <img alt="All releases" src="https://img.shields.io/badge/All_releases-v0.1.0_early_preview-orange?style=for-the-badge" height="44">
   </a>
 </p>
@@ -32,7 +32,7 @@ daily use.**
 
 Termux runs the binary inside an app sandbox: the moment Android freezes or kills Termux (locked screen, memory
 pressure, reboot), **sshd, the CLI and the gateway die with it**. `termux-wake-lock` does not change that.
-AndroClaw implements the Android contract that lets a program live:
+KeepClaw implements the Android contract that lets a program live:
 
 | Clause | Implementation |
 |---|---|
@@ -51,22 +51,22 @@ Requires **Android 8.0+** and an **arm64-v8a** device. The APK is self-signed: A
 unknown source — expected for a sideloaded app.
 
 ```bash
-adb install -r AndroClaw-0.1.0-release.apk
+adb install -r KeepClaw-0.1.0-release.apk
 ```
 
 Verify what you downloaded before installing:
 
 ```
-APK   9e0d3c3eb8639ee9e20baa7f05fcaaa357f76c9aa3a1e5f86bdb4140b4141c76
-SRC   950df236317cba2e7515660ad0aabdaf7031e1a0a3bffbaf5cf283901c3f1eb8
+APK   47013f9c91904bf060ac1791d64df4bc0ebdc550e58f2a6bb737fe1199c52d4b
+SRC   38ec6b46d54a4a574ee3a2365720f19b6fd52acb2fc9ead04fa8c0268ebbf640
 ```
 
 ```bash
 shasum -a 256 -c SHA256SUMS.txt      # macOS
 sha256sum -c SHA256SUMS.txt          # Linux
-apksigner verify --print-certs AndroClaw-0.1.0-release.apk
+apksigner verify --print-certs KeepClaw-0.1.0-release.apk
 # Signer #1 certificate SHA-256:
-# 43e81772465680080853a8d7a451a18fbe4ed3cdbd70b420b75eb914292d36fe
+# 6a0929eeb563a43abdbb5f3a75d09f5149c56ca2f807bb6322ac4818ace0ce02
 ```
 
 First run: tap **🔋** once (battery exemption) → open the console → create the console password → add a model
@@ -94,8 +94,8 @@ brew install --cask android-commandlinetools
 sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 npm i -g pnpm@10.33.0
 
-git clone --recursive https://github.com/leakedd/AndroClaw
-cd AndroClaw
+git clone --recursive https://github.com/leakedd/KeepClaw
+cd KeepClaw
 ./scripts/build-native.sh          # brand + patches + frontend + core + console → jniLibs
 ./scripts/init-keystore.sh         # once: self-signed keystore
 ./scripts/build-apk.sh assembleRelease
@@ -123,6 +123,6 @@ No CLA: by submitting a PR you agree your contribution is licensed under MIT (in
 
 ## Licence and credits
 
-MIT. AndroClaw is a host for [picoclaw](https://github.com/sipeed/picoclaw) by its contributors, pinned at
+MIT. KeepClaw is a host for [picoclaw](https://github.com/sipeed/picoclaw) by its contributors, pinned at
 `bbf6893ca7af` — the upstream copyright notice is reproduced in [LICENSE](LICENSE). The Go import paths
 (`github.com/sipeed/picoclaw/...`) are intentionally untouched: they are build identifiers, not branding.

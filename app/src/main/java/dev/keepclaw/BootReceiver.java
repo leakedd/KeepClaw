@@ -1,4 +1,4 @@
-package dev.androclaw;
+package dev.keepclaw;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -20,13 +20,13 @@ public class BootReceiver extends BroadcastReceiver {
                 && !"android.intent.action.LOCKED_BOOT_COMPLETED".equals(action)
                 && !"android.intent.action.MY_PACKAGE_REPLACED".equals(action)) return;
 
-        Log.i("AndroClaw", "boot reçu : " + action + " -> démarrage du gateway");
+        Log.i("KeepClaw", "boot reçu : " + action + " -> démarrage du gateway");
         Intent i = new Intent(context, CoreService.class).setAction(CoreService.ACTION_START);
         try {
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
             else context.startService(i);
         } catch (Exception e) {
-            Log.w("AndroClaw", "démarrage au boot refusé : " + e.getMessage());
+            Log.w("KeepClaw", "démarrage au boot refusé : " + e.getMessage());
         }
     }
 }

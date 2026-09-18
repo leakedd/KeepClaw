@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AndroClaw — compile les deux binaires Go (core + console) pour android/arm64
+# KeepClaw — compile les deux binaires Go (core + console) pour android/arm64
 # et les dépose dans app/src/main/jniLibs/arm64-v8a/ sous la forme lib*.so
 # (forme exigée par PackageManager pour être extraits vers nativeLibraryDir, zone exec-able).
 set -euo pipefail
@@ -35,7 +35,7 @@ if [ -f "$ROOT/scripts/fix-lockfile.py" ] && [ -f "$SRC/web/frontend/pnpm-lock.y
     && echo "   lockfile vérifié/dédupliqué" || echo "   (déduplication lockfile ignorée)"
 fi
 
-# Branding : applique notre marque (AndroClaw) sur les sources du sous-module avant compilation.
+# Branding : applique notre marque (KeepClaw) sur les sources du sous-module avant compilation.
 # Idempotent (voir scripts/brand.py) : relancer ne change rien.
 if [ -f "$ROOT/scripts/brand.py" ]; then
   echo "== 0/3 branding =="
@@ -49,7 +49,7 @@ if [ -f "$ROOT/scripts/patch-ui.sh" ]; then
   "$ROOT/scripts/patch-ui.sh" | sed 's/^/   /'
 fi
 
-# Branding console : logo avec texte + favicons generes depuis le logo AndroClaw
+# Branding console : logo avec texte + favicons generes depuis le logo KeepClaw
 # (les binaires du sous-module ne peuvent pas etre patchees proprement).
 if [ -f "$ROOT/scripts/make-icons.py" ]; then
   echo "== 0ter/3 branding console =="
@@ -60,8 +60,18 @@ echo "== 1/3 frontend (embed dans web/backend/dist) =="
 if [ ! -f "$SRC/web/backend/dist/index.html" ]; then
   echo "   build frontend requis (pnpm + vite)…"
   ( cd "$SRC/web/frontend" \
-    && CI=true pnpm install --frozen-lockfile \
-    && pnpm build:backend )
+    && CI=true pnpm install --frozen-lockfile )
+  # La table de routes du routeur TanStack (src/routeTree.gen.ts) n'est regeneree
+  # QUE par vite : le script upstream « build:backend » fait « tsc -b && vite build »,
+  # donc tsc type-check une table perimee (et echoue sur les routes ajoutees par nos
+  # patches) des qu'on part d'un arbre propre — clone neuf ou apres « git clean ».
+  # On lance donc vite une premiere fois (807 ms) pour regenerer la table, puis le
+  # script upstream qui re-type-check et reconstruit.
+  echo "   regeneration de la table de routes (vite)…"
+  ( cd "$SRC/web/frontend" \
+    && CI=true pnpm exec vite build --outDir ../backend/dist --emptyOutDir >/dev/null 2>&1 )
+  ( cd "$SRC/web/frontend" \
+    && CI=true pnpm build:backend )
 else
   echo "   dist déjà présent"
 fi

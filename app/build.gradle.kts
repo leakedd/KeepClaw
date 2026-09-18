@@ -11,11 +11,11 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "dev.androclaw"
+    namespace = "dev.keepclaw"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.androclaw"
+        applicationId = "dev.keepclaw"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -51,7 +51,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // IMPORTANT AndroClaw : les binaires Go vivent dans jniLibs/arm64-v8a sous le nom lib*.so
+    // IMPORTANT KeepClaw : les binaires Go vivent dans jniLibs/arm64-v8a sous le nom lib*.so
     // pour être extraits par PackageManager vers nativeLibraryDir (zone exec-able).
     androidResources {
         noCompress += listOf("so")
