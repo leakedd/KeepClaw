@@ -1,0 +1,786 @@
+--- a/web/backend/api/gateway.go
++++ b/web/backend/api/gateway.go
+@@ -11,6 +11,7 @@
+ 	"net/http"
+ 	"os"
+ 	"os/exec"
++	"path/filepath"
+ 	"reflect"
+ 	"runtime"
+ 	"sort"
+@@ -199,6 +200,13 @@
+ 		return false, true
+ 	}
+ 
++	// Prefer /proc: on Android `ps -o command=` can report only the process
++	// name ("libcore.so"), which would make this inspection wrongly conclude
++	// that a live gateway is not a gateway process.
++	if cmdline, ok := procCmdline(pid); ok {
++		return looksLikeGatewayCommandLine(cmdline), true
++	}
++
+ 	out, err := launcherExecCommand("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output()
+ 	if err != nil {
+ 		return false, false
+@@ -221,11 +229,323 @@
+ 		token := strings.Trim(f, `"'`)
+ 		if token == "gateway" || strings.HasSuffix(token, "/gateway") || strings.HasSuffix(token, `\gateway`) {
+ 			return true
++		}
++	}
++	return false
++}
++
++var (
++	gatewayListeningPids  = listeningPidsOnPort
++	gatewayOwnedProcess   = isOwnGatewayProcess
++	gatewaySignalProcess  = signalGatewayProcess
++	gatewayPortProbe      = portAcceptsConnections
++	gatewayPortFreeWait   = 3 * time.Second
++	gatewayPortPollPeriod = 100 * time.Millisecond
++)
++
++const (
++	gatewayAdoptDialTimeout   = 250 * time.Millisecond
++	gatewayAdoptHealthTimeout = 1200 * time.Millisecond
++)
++
++// portAcceptsConnections reports whether something is listening on host:port.
++func portAcceptsConnections(host string, port int, timeout time.Duration) bool {
++	if port <= 0 {
++		return false
++	}
++	if strings.TrimSpace(host) == "" {
++		host = netbind.ResolveAdaptiveLoopbackHost()
++	}
++	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), timeout)
++	if err != nil {
++		return false
++	}
++	_ = conn.Close()
++	return true
++}
++
++// adoptHealthyGateway attaches to a gateway that already listens on the
++// configured port even when its pid file is unavailable or was ignored (for
++// example after a reset). The health endpoint is the source of truth: only a
++// responsive gateway is adopted, never a foreign listener.
++func (h *Handler) adoptHealthyGateway() (int, bool) {
++	gateway.mu.Lock()
++	tracked := gateway.cmd != nil && gateway.cmd.Process != nil && isCmdProcessAliveLocked(gateway.cmd)
++	gateway.mu.Unlock()
++	if tracked {
++		return 0, false
++	}
++
++	cfg, err := config.LoadConfig(h.configPath)
++	if err != nil {
++		return 0, false
++	}
++
++	port := 18790
++	if cfg != nil && cfg.Gateway.Port != 0 {
++		port = cfg.Gateway.Port
++	}
++	host := gatewayProbeHost(h.effectiveGatewayBindHost(cfg))
++	if !gatewayPortProbe(host, port, gatewayAdoptDialTimeout) {
++		return 0, false
++	}
++
++	resp, statusCode, err := h.getGatewayHealth(cfg, gatewayAdoptHealthTimeout)
++	if err != nil || resp == nil || statusCode != http.StatusOK || resp.PID <= 0 {
++		return 0, false
++	}
++
++	gateway.mu.Lock()
++	defer gateway.mu.Unlock()
++	if gateway.cmd != nil && gateway.cmd.Process != nil && isCmdProcessAliveLocked(gateway.cmd) {
++		return gateway.cmd.Process.Pid, true
++	}
++	if attachErr := attachToGatewayProcessLocked(resp.PID, cfg); attachErr != nil {
++		logger.WarnC("gateway", fmt.Sprintf(
++			"Found healthy gateway (PID %d) but could not attach: %v",
++			resp.PID,
++			attachErr,
++		))
++		return 0, false
++	}
++	gateway.pidData = &ppid.PidFileData{
++		PID:  resp.PID,
++		Port: port,
++		Host: h.effectiveGatewayBindHost(cfg),
++	}
++	logger.InfoC("gateway", fmt.Sprintf("Adopted healthy gateway (PID: %d)", resp.PID))
++	return resp.PID, true
++}
++
++// releaseStaleGatewayPort terminates a leftover gateway process that still
++// listens on the configured port while the launcher no longer tracks it (for
++// example after a reset or a launcher restart cleared picoclaw.pid.json).
++// Without this, starting the gateway fails with "address already in use" while
++// the UI keeps showing "stopped".
++func (h *Handler) releaseStaleGatewayPort(cfg *config.Config) {
++	if cfg == nil {
++		return
++	}
++	port := cfg.Gateway.Port
++	if port <= 0 {
++		return
++	}
++
++	var terminated []int
++	for _, pid := range gatewayListeningPids(port) {
++		if pid <= 0 || pid == os.Getpid() || !gatewayOwnedProcess(pid) {
++			continue
++		}
++		logger.WarnC("gateway", fmt.Sprintf(
++			"Terminating stale gateway process (PID %d) holding port %d",
++			pid,
++			port,
++		))
++		if err := gatewaySignalProcess(pid, syscall.SIGTERM); err != nil {
++			logger.WarnC("gateway", fmt.Sprintf("Failed to terminate stale gateway PID %d: %v", pid, err))
++			continue
++		}
++		terminated = append(terminated, pid)
++	}
++	if len(terminated) == 0 {
++		return
++	}
++
++	if waitForPortRelease(port) {
++		return
++	}
++	for _, pid := range terminated {
++		if err := gatewaySignalProcess(pid, syscall.SIGKILL); err == nil {
++			logger.WarnC("gateway", fmt.Sprintf("Force-killed stale gateway PID %d", pid))
++		}
++	}
++	if !waitForPortRelease(port) {
++		logger.ErrorC("gateway", fmt.Sprintf(
++			"Port %d is still busy after terminating the stale gateway process",
++			port,
++		))
++	}
++}
++
++func waitForPortRelease(port int) bool {
++	deadline := time.Now().Add(gatewayPortFreeWait)
++	for {
++		if len(gatewayListeningPids(port)) == 0 {
++			return true
++		}
++		if !time.Now().Before(deadline) {
++			return false
++		}
++		time.Sleep(gatewayPortPollPeriod)
++	}
++}
++
++// listeningPidsOnPort returns the PIDs listening on the given TCP port,
++// including loopback. It uses /proc on Linux/Android and falls back to lsof.
++func listeningPidsOnPort(port int) []int {
++	if port <= 0 {
++		return nil
++	}
++	if inodes := procListenInodes(port); len(inodes) > 0 {
++		return pidsForSocketInodes(inodes)
++	}
++	return lsofListeningPids(port)
++}
++
++func procListenInodes(port int) []uint64 {
++	var inodes []uint64
++	for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
++		data, err := os.ReadFile(path)
++		if err != nil {
++			continue
++		}
++		inodes = append(inodes, parseProcNetListeners(string(data), port)...)
++	}
++	return inodes
++}
++
++// parseProcNetListeners extracts socket inodes of LISTEN sockets on port from
++// /proc/net/tcp(6) content.
++func parseProcNetListeners(data string, port int) []uint64 {
++	var inodes []uint64
++	for i, line := range strings.Split(data, "\n") {
++		if i == 0 {
++			continue // header
++		}
++		fields := strings.Fields(line)
++		if len(fields) < 10 || fields[3] != "0A" {
++			continue
++		}
++		_, portHex, found := strings.Cut(fields[1], ":")
++		if !found {
++			continue
++		}
++		value, err := strconv.ParseInt(portHex, 16, 32)
++		if err != nil || int(value) != port {
++			continue
++		}
++		inode, err := strconv.ParseUint(fields[9], 10, 64)
++		if err != nil || inode == 0 {
++			continue
++		}
++		inodes = append(inodes, inode)
++	}
++	return inodes
++}
++
++func pidsForSocketInodes(inodes []uint64) []int {
++	if len(inodes) == 0 {
++		return nil
++	}
++	wanted := make(map[string]struct{}, len(inodes))
++	for _, inode := range inodes {
++		wanted["socket:["+strconv.FormatUint(inode, 10)+"]"] = struct{}{}
++	}
++
++	entries, err := os.ReadDir("/proc")
++	if err != nil {
++		return nil
++	}
++
++	var pids []int
++	for _, entry := range entries {
++		pid, err := strconv.Atoi(entry.Name())
++		if err != nil || pid <= 0 {
++			continue
++		}
++		fdDir := filepath.Join("/proc", entry.Name(), "fd")
++		fds, err := os.ReadDir(fdDir)
++		if err != nil {
++			continue
++		}
++		for _, fd := range fds {
++			target, err := os.Readlink(filepath.Join(fdDir, fd.Name()))
++			if err != nil {
++				continue
++			}
++			if _, ok := wanted[target]; ok {
++				pids = append(pids, pid)
++				break
++			}
++		}
++	}
++	return pids
++}
++
++// isOwnGatewayProcess reports whether pid runs under the current user and
++// looks like a gateway command line.
++func isOwnGatewayProcess(pid int) bool {
++	if pid <= 0 {
++		return false
++	}
++	if cmdline, ok := procCmdline(pid); ok {
++		if !procOwnedByCurrentUser(pid) {
++			return false
++		}
++		return looksLikeGatewayCommandLine(cmdline)
++	}
++	likely, inspected := gatewayProcessMatcher(pid)
++	return inspected && likely
++}
++
++func procCmdline(pid int) (string, bool) {
++	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
++	if err != nil || len(data) == 0 {
++		return "", false
++	}
++	parts := bytes.Split(bytes.TrimRight(data, "\x00"), []byte{0})
++	fields := make([]string, 0, len(parts))
++	for _, part := range parts {
++		if len(part) > 0 {
++			fields = append(fields, string(part))
++		}
++	}
++	return strings.Join(fields, " "), true
++}
++
++func procOwnedByCurrentUser(pid int) bool {
++	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "status"))
++	if err != nil {
++		return false
++	}
++	for _, line := range strings.Split(string(data), "\n") {
++		if !strings.HasPrefix(line, "Uid:") {
++			continue
+ 		}
++		fields := strings.Fields(strings.TrimPrefix(line, "Uid:"))
++		if len(fields) == 0 {
++			return false
++		}
++		uid, err := strconv.Atoi(fields[0])
++		return err == nil && uid == os.Getuid()
+ 	}
+ 	return false
+ }
+ 
++func signalGatewayProcess(pid int, sig syscall.Signal) error {
++	return syscall.Kill(pid, sig)
++}
++
++func lsofListeningPids(port int) []int {
++	out, err := launcherExecCommand(
++		"lsof",
++		"-nP",
++		fmt.Sprintf("-iTCP:%d", port),
++		"-sTCP:LISTEN",
++		"-t",
++	).Output()
++	if err != nil {
++		return nil
++	}
++	var pids []int
++	for _, line := range strings.Split(string(out), "\n") {
++		if pid, err := strconv.Atoi(strings.TrimSpace(line)); err == nil && pid > 0 {
++			pids = append(pids, pid)
++		}
++	}
++	return pids
++}
++
+ func (h *Handler) getGatewayHealthForPidData(
+ 	pidData *ppid.PidFileData,
+ 	cfg *config.Config,
+@@ -338,7 +658,17 @@
+ 			refreshPicoTokensLocked(h.configPath)
+ 			logger.InfoC("gateway", fmt.Sprintf("Attached to running gateway via PID file (PID: %d)", pid))
+ 		}
++		gateway.mu.Unlock()
++		return
++	}
++
++	// No pid file: adopt a healthy gateway that is still listening instead of
++	// spawning a duplicate that would fail to bind the port.
++	if pid, ok := h.adoptHealthyGateway(); ok {
++		gateway.mu.Lock()
++		refreshPicoTokensLocked(h.configPath)
+ 		gateway.mu.Unlock()
++		logger.InfoC("gateway", fmt.Sprintf("Attached to healthy running gateway (PID: %d)", pid))
+ 		return
+ 	}
+ 
+@@ -1093,6 +1423,10 @@
+ 		defaultModelName = strings.TrimSpace(cfg.Agents.Defaults.GetModelName())
+ 	}
+ 
++	// The previous gateway may still hold the listening port while the launcher
++	// lost track of it (cleared pid file): free the port before spawning.
++	h.releaseStaleGatewayPort(cfg)
++
+ 	if err := cmd.Start(); err != nil {
+ 		return 0, fmt.Errorf("failed to start gateway: %w", err)
+ 	}
+@@ -1225,6 +1559,19 @@
+ 		}
+ 		gateway.pidData = pidData
+ 		gateway.mu.Unlock()
++		w.Header().Set("Content-Type", "application/json")
++		w.WriteHeader(http.StatusOK)
++		json.NewEncoder(w).Encode(map[string]any{
++			"status": "ok",
++			"pid":    pid,
++		})
++		return
++	}
++
++	// No pid file: the gateway may still be listening (its pid file can be
++	// removed by a reset). Adopt it instead of spawning a duplicate that
++	// would fail to bind the port.
++	if pid, ok := h.adoptHealthyGateway(); ok {
+ 		w.Header().Set("Content-Type", "application/json")
+ 		w.WriteHeader(http.StatusOK)
+ 		json.NewEncoder(w).Encode(map[string]any{
+@@ -1238,6 +1585,18 @@
+ 	defer gateway.mu.Unlock()
+ 
+ 	if gateway.cmd != nil && gateway.cmd.Process != nil {
++		if isCmdProcessAliveLocked(gateway.cmd) {
++			// Already tracking a live gateway: report it instead of spawning
++			// a duplicate that would fail to bind the port.
++			pid := gateway.cmd.Process.Pid
++			w.Header().Set("Content-Type", "application/json")
++			w.WriteHeader(http.StatusOK)
++			json.NewEncoder(w).Encode(map[string]any{
++				"status": "ok",
++				"pid":    pid,
++			})
++			return
++		}
+ 		gateway.cmd = nil
+ 		setGatewayRuntimeStatusLocked("stopped")
+ 	}
+@@ -1465,11 +1824,20 @@
+ 		}
+ 		data["gateway_status"] = "running"
+ 		data["pid"] = pidData.PID
++		gateway.mu.Unlock()
++	} else if pid, ok := h.adoptHealthyGateway(); ok {
++		gateway.mu.Lock()
++		if gateway.pidData != nil && gateway.pidData.Version != "" {
++			data["gateway_version"] = gateway.pidData.Version
++		}
++		bootDefaultModel := gateway.bootDefaultModel
+ 		gateway.mu.Unlock()
++		if bootDefaultModel != "" {
++			data["boot_default_model"] = bootDefaultModel
++		}
++		data["gateway_status"] = "running"
++		data["pid"] = pid
+ 	} else {
+-		// Intentionally skip health probe here; the startup goroutine
+-		// (startGatewayLocked) already handles liveness detection via
+-		// pidFile polling and health fallback.
+ 		gateway.mu.Lock()
+ 		status := gatewayStatusWithoutHealthLocked()
+ 		data["gateway_status"] = status
+--- a/web/backend/api/gateway_test.go
++++ b/web/backend/api/gateway_test.go
+@@ -12,6 +12,7 @@
+ 	"runtime"
+ 	"strconv"
+ 	"strings"
++	"syscall"
+ 	"testing"
+ 	"time"
+ 
+@@ -101,6 +102,7 @@
+ 	originalRestartGracePeriod := gatewayRestartGracePeriod
+ 	originalRestartForceKillWindow := gatewayRestartForceKillWindow
+ 	originalRestartPollInterval := gatewayRestartPollInterval
++	originalPortProbe := gatewayPortProbe
+ 	t.Setenv("ANDROCLAW_HOME", t.TempDir())
+ 	t.Cleanup(func() {
+ 		gatewayHealthGet = originalHealthGet
+@@ -109,6 +111,7 @@
+ 		gatewayRestartGracePeriod = originalRestartGracePeriod
+ 		gatewayRestartForceKillWindow = originalRestartForceKillWindow
+ 		gatewayRestartPollInterval = originalRestartPollInterval
++		gatewayPortProbe = originalPortProbe
+ 
+ 		gateway.mu.Lock()
+ 		gateway.cmd = nil
+@@ -2592,3 +2595,319 @@
+ 		t.Fatalf("matches = %#v, want resolver-selected index 1", matches)
+ 	}
+ }
++
++func swapGatewayPortHooks(
++	t *testing.T,
++	listen func(int) []int,
++	owned func(int) bool,
++	signal func(int, syscall.Signal) error,
++) {
++	t.Helper()
++	prevListen, prevOwned, prevSignal := gatewayListeningPids, gatewayOwnedProcess, gatewaySignalProcess
++	prevWait, prevPeriod := gatewayPortFreeWait, gatewayPortPollPeriod
++	gatewayListeningPids, gatewayOwnedProcess, gatewaySignalProcess = listen, owned, signal
++	gatewayPortFreeWait, gatewayPortPollPeriod = 20*time.Millisecond, 2*time.Millisecond
++	t.Cleanup(func() {
++		gatewayListeningPids, gatewayOwnedProcess, gatewaySignalProcess = prevListen, prevOwned, prevSignal
++		gatewayPortFreeWait, gatewayPortPollPeriod = prevWait, prevPeriod
++	})
++}
++
++func TestParseProcNetListeners(t *testing.T) {
++	// Port 18790 = 0x4966, port 18800 = 0x4970.
++	data := strings.Join([]string{
++		"  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode",
++		"   0: 0100007F:4966 00000000:0000 0A 00000000:00000000 00:00000000 00000000 10356        0 4142830 1 0000000000000000 100 0 0 10 0",
++		"   1: 0100007F:4970 00000000:0000 0A 00000000:00000000 00:00000000 00000000 10356        0 4156405 1 0000000000000000 100 0 0 10 0",
++		"   2: 0100007F:4966 0100007F:E188 01 00000000:00000000 02:000001D0 00000000 10356        0 4142831 3 0000000000000000 20 4 31 10 -1",
++	}, "\n")
++
++	inodes := parseProcNetListeners(data, 18790)
++	if len(inodes) != 1 || inodes[0] != 4142830 {
++		t.Fatalf("parseProcNetListeners(18790) = %v, want [4142830]", inodes)
++	}
++	if got := parseProcNetListeners(data, 18791); len(got) != 0 {
++		t.Fatalf("parseProcNetListeners(18791) = %v, want none", got)
++	}
++}
++
++func TestParseProcNetListenersIgnoresGarbage(t *testing.T) {
++	for _, data := range []string{"", "header only", "\x00\x01 not a table", "1: malformed"} {
++		if got := parseProcNetListeners(data, 18790); len(got) != 0 {
++			t.Fatalf("parseProcNetListeners(%q) = %v, want none", data, got)
++		}
++	}
++}
++
++func TestReleaseStaleGatewayPortTerminatesOwnedProcess(t *testing.T) {
++	listening := true
++	var signals []syscall.Signal
++	swapGatewayPortHooks(t,
++		func(int) []int {
++			if listening {
++				return []int{4242}
++			}
++			return nil
++		},
++		func(pid int) bool { return pid == 4242 },
++		func(pid int, sig syscall.Signal) error {
++			signals = append(signals, sig)
++			if sig == syscall.SIGTERM {
++				listening = false
++			}
++			return nil
++		},
++	)
++
++	h := &Handler{}
++	h.releaseStaleGatewayPort(&config.Config{Gateway: config.GatewayConfig{Port: 18790}})
++
++	if len(signals) != 1 || signals[0] != syscall.SIGTERM {
++		t.Fatalf("signals = %v, want [SIGTERM]", signals)
++	}
++}
++
++func TestReleaseStaleGatewayPortForceKillsWhenTermIgnored(t *testing.T) {
++	var signals []syscall.Signal
++	swapGatewayPortHooks(t,
++		func(int) []int { return []int{4242} },
++		func(pid int) bool { return pid == 4242 },
++		func(pid int, sig syscall.Signal) error {
++			signals = append(signals, sig)
++			return nil
++		},
++	)
++
++	h := &Handler{}
++	h.releaseStaleGatewayPort(&config.Config{Gateway: config.GatewayConfig{Port: 18790}})
++
++	if len(signals) != 2 || signals[0] != syscall.SIGTERM || signals[1] != syscall.SIGKILL {
++		t.Fatalf("signals = %v, want [SIGTERM SIGKILL]", signals)
++	}
++}
++
++func TestReleaseStaleGatewayPortSkipsForeignProcess(t *testing.T) {
++	var signals []syscall.Signal
++	swapGatewayPortHooks(t,
++		func(int) []int { return []int{4242} },
++		func(int) bool { return false },
++		func(pid int, sig syscall.Signal) error {
++			signals = append(signals, sig)
++			return nil
++		},
++	)
++
++	h := &Handler{}
++	h.releaseStaleGatewayPort(&config.Config{Gateway: config.GatewayConfig{Port: 18790}})
++
++	if len(signals) != 0 {
++		t.Fatalf("signals = %v, want none for a foreign process", signals)
++	}
++}
++
++func TestReleaseStaleGatewayPortNoopWithoutListener(t *testing.T) {
++	var signals []syscall.Signal
++	swapGatewayPortHooks(t,
++		func(int) []int { return nil },
++		func(int) bool { return true },
++		func(pid int, sig syscall.Signal) error {
++			signals = append(signals, sig)
++			return nil
++		},
++	)
++
++	h := &Handler{}
++	h.releaseStaleGatewayPort(&config.Config{Gateway: config.GatewayConfig{Port: 18790}})
++	h.releaseStaleGatewayPort(nil)
++
++	if len(signals) != 0 {
++		t.Fatalf("signals = %v, want none", signals)
++	}
++}
++
++func TestIsOwnGatewayProcessRejectsTestRunner(t *testing.T) {
++	if isOwnGatewayProcess(os.Getpid()) {
++		t.Fatal("test runner must not be detected as a gateway process")
++	}
++	if isOwnGatewayProcess(0) || isOwnGatewayProcess(-1) {
++		t.Fatal("invalid pids must be rejected")
++	}
++}
++
++func swapGatewayAdoptHooks(
++	t *testing.T,
++	probe func(string, int, time.Duration) bool,
++	health func(string, time.Duration) (*http.Response, error),
++) {
++	t.Helper()
++	prevProbe, prevHealth := gatewayPortProbe, gatewayHealthGet
++	gatewayPortProbe, gatewayHealthGet = probe, health
++	t.Cleanup(func() {
++		gatewayPortProbe, gatewayHealthGet = prevProbe, prevHealth
++	})
++}
++
++func TestGatewayStatusAdoptsHealthyGatewayWithoutPidFile(t *testing.T) {
++	resetGatewayTestState(t)
++
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	h := NewHandler(configPath)
++	mux := http.NewServeMux()
++	h.RegisterRoutes(mux)
++
++	swapGatewayAdoptHooks(t,
++		func(string, int, time.Duration) bool { return true },
++		func(string, time.Duration) (*http.Response, error) {
++			return mockGatewayHealthResponse(http.StatusOK, 4242), nil
++		},
++	)
++
++	rec := httptest.NewRecorder()
++	req := httptest.NewRequest(http.MethodGet, "/api/gateway/status", nil)
++	mux.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
++	}
++
++	var body map[string]any
++	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
++		t.Fatalf("unmarshal response: %v", err)
++	}
++	if got := body["gateway_status"]; got != "running" {
++		t.Fatalf("gateway_status = %#v, want %q", got, "running")
++	}
++	if got := body["pid"]; got != float64(4242) {
++		t.Fatalf("pid = %#v, want 4242", got)
++	}
++
++	gateway.mu.Lock()
++	defer gateway.mu.Unlock()
++	if gateway.cmd == nil || gateway.cmd.Process == nil || gateway.cmd.Process.Pid != 4242 {
++		t.Fatal("healthy gateway was not attached")
++	}
++	if gateway.owned {
++		t.Fatal("adopted gateway must not be marked as owned")
++	}
++	if gateway.pidData == nil || gateway.pidData.PID != 4242 {
++		t.Fatalf("pidData = %#v, want PID 4242", gateway.pidData)
++	}
++}
++
++func TestGatewayStatusIgnoresUnhealthyListenerWithoutPidFile(t *testing.T) {
++	resetGatewayTestState(t)
++
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	h := NewHandler(configPath)
++	mux := http.NewServeMux()
++	h.RegisterRoutes(mux)
++
++	swapGatewayAdoptHooks(t,
++		func(string, int, time.Duration) bool { return true },
++		func(string, time.Duration) (*http.Response, error) {
++			return nil, errors.New("probe failed")
++		},
++	)
++
++	rec := httptest.NewRecorder()
++	req := httptest.NewRequest(http.MethodGet, "/api/gateway/status", nil)
++	mux.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
++	}
++
++	var body map[string]any
++	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
++		t.Fatalf("unmarshal response: %v", err)
++	}
++	if got := body["gateway_status"]; got == "running" {
++		t.Fatal("an unhealthy listener must not be adopted")
++	}
++
++	gateway.mu.Lock()
++	defer gateway.mu.Unlock()
++	if gateway.cmd != nil {
++		t.Fatal("no process must be attached for an unhealthy listener")
++	}
++}
++
++func TestGatewayStartAdoptsHealthyGatewayWithoutPidFile(t *testing.T) {
++	resetGatewayTestState(t)
++
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	h := NewHandler(configPath)
++	mux := http.NewServeMux()
++	h.RegisterRoutes(mux)
++
++	swapGatewayAdoptHooks(t,
++		func(string, int, time.Duration) bool { return true },
++		func(string, time.Duration) (*http.Response, error) {
++			return mockGatewayHealthResponse(http.StatusOK, 4242), nil
++		},
++	)
++	gatewayExecCommand = func(string, ...string) *exec.Cmd {
++		t.Fatal("start must adopt the healthy gateway instead of spawning a process")
++		return nil
++	}
++
++	rec := httptest.NewRecorder()
++	req := httptest.NewRequest(http.MethodPost, "/api/gateway/start", nil)
++	mux.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Fatalf("status = %d, want %d (body: %s)", rec.Code, http.StatusOK, rec.Body.String())
++	}
++
++	var body map[string]any
++	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
++		t.Fatalf("unmarshal response: %v", err)
++	}
++	if got := body["pid"]; got != float64(4242) {
++		t.Fatalf("pid = %#v, want 4242", got)
++	}
++}
++
++func TestGatewayStartDoesNotSpawnDuplicateWhenTrackedProcessAlive(t *testing.T) {
++	resetGatewayTestState(t)
++
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	h := NewHandler(configPath)
++	mux := http.NewServeMux()
++	h.RegisterRoutes(mux)
++
++	cmd := startLongRunningProcess(t)
++	t.Cleanup(func() {
++		if cmd.Process != nil {
++			_ = cmd.Process.Kill()
++		}
++		_ = cmd.Wait()
++	})
++
++	gateway.mu.Lock()
++	gateway.cmd = cmd
++	gateway.owned = true
++	setGatewayRuntimeStatusLocked("running")
++	gateway.mu.Unlock()
++
++	gatewayExecCommand = func(string, ...string) *exec.Cmd {
++		t.Fatal("start must not spawn a duplicate while a tracked process is alive")
++		return nil
++	}
++
++	rec := httptest.NewRecorder()
++	req := httptest.NewRequest(http.MethodPost, "/api/gateway/start", nil)
++	mux.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Fatalf("status = %d, want %d (body: %s)", rec.Code, http.StatusOK, rec.Body.String())
++	}
++
++	var body map[string]any
++	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
++		t.Fatalf("unmarshal response: %v", err)
++	}
++	if got := body["pid"]; got != float64(cmd.Process.Pid) {
++		t.Fatalf("pid = %#v, want %d", got, cmd.Process.Pid)
++	}
++}

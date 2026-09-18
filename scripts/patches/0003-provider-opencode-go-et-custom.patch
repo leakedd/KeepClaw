@@ -1,0 +1,177 @@
+--- a/pkg/providers/provider_metadata.go
++++ b/pkg/providers/provider_metadata.go
+@@ -20,6 +20,9 @@
+ 	Priority            float64  `json:"priority,omitempty"`
+ 	CommonModels        []string `json:"common_models,omitempty"`
+ 	Aliases             []string `json:"aliases,omitempty"`
++	// DefaultHeaders are injected into every HTTP request for models of this
++	// provider unless the model config overrides the same header.
++	DefaultHeaders map[string]string `json:"default_headers,omitempty"`
+ 
+ 	httpAPI bool `json:"-"`
+ }
+@@ -578,6 +581,31 @@
+ 		Priority:            34,
+ 		CommonModels:        []string{"qwen3.6-max-preview", "qwen3.6-plus", "qwen3.6-flash", "qwen3-coder-next"},
+ 		Aliases:             []string{"dashscope-us"},
++		httpAPI:             true,
++	},
++	"opencode-go": {
++		ID:                  "opencode-go",
++		DisplayName:         "OpenCode Go",
++		Domain:              "opencode.ai",
++		DefaultAPIBase:      "https://opencode.ai/zen/go/v1",
++		CreateAllowed:       true,
++		DefaultModelAllowed: true,
++		SupportsFetch:       true,
++		Priority:            45,
++		CommonModels:        []string{"mimo-v2.5", "deepseek-v4.1-flash", "kimi-k3", "glm-5.3"},
++		Aliases:             []string{"opencode-zen"},
++		DefaultHeaders:      map[string]string{"x-opencode-session": "androclaw"},
++		httpAPI:             true,
++	},
++	"custom": {
++		ID:                  "custom",
++		DisplayName:         "Custom (OpenAI compatible)",
++		CreateAllowed:       true,
++		DefaultModelAllowed: true,
++		SupportsFetch:       true,
++		EmptyAPIKeyAllowed:  true,
++		Priority:            1,
++		Aliases:             []string{"openai-compatible", "compatible"},
+ 		httpAPI:             true,
+ 	},
+ }
+@@ -612,3 +640,17 @@
+ 	option, ok := modelProviderOptionsByName[normalized]
+ 	return option, ok
+ }
++
++// DefaultHeadersFor returns a copy of the provider's default HTTP headers.
++// It returns nil when the provider is unknown or defines no default headers.
++func DefaultHeadersFor(provider string) map[string]string {
++	option, ok := modelProviderOptionForName(provider)
++	if !ok || len(option.DefaultHeaders) == 0 {
++		return nil
++	}
++	headers := make(map[string]string, len(option.DefaultHeaders))
++	for name, value := range option.DefaultHeaders {
++		headers[name] = value
++	}
++	return headers
++}
+--- a/pkg/providers/factory_provider.go
++++ b/pkg/providers/factory_provider.go
+@@ -80,6 +80,28 @@
+ 	}
+ 	protocol, _ := ExtractProtocol(cfg)
+ 	return strings.TrimRight(getDefaultAPIBase(protocol), "/")
++}
++
++// withDefaultProviderHeaders returns a shallow copy of cfg whose CustomHeaders
++// include the provider's default headers. Explicit model headers win over
++// provider defaults, and the original cfg is never mutated.
++func withDefaultProviderHeaders(cfg *config.ModelConfig, protocol string) *config.ModelConfig {
++	defaults := DefaultHeadersFor(protocol)
++	if len(defaults) == 0 {
++		return cfg
++	}
++
++	merged := make(map[string]string, len(defaults)+len(cfg.CustomHeaders))
++	for name, value := range defaults {
++		merged[name] = value
++	}
++	for name, value := range cfg.CustomHeaders {
++		merged[name] = value
++	}
++
++	clone := *cfg
++	clone.CustomHeaders = merged
++	return &clone
+ }
+ 
+ // CreateProviderFromConfig creates a provider based on the ModelConfig.
+@@ -100,6 +122,10 @@
+ 	protocol, modelID := ExtractProtocol(cfg)
+ 	authMethod := strings.ToLower(strings.TrimSpace(cfg.AuthMethod))
+ 
++	// Providers may define default HTTP headers (e.g. opencode-go's routing
++	// session header). Explicit model headers always win.
++	cfg = withDefaultProviderHeaders(cfg, protocol)
++
+ 	userAgent := cfg.UserAgent
+ 	if userAgent == "" {
+ 		userAgent = fmt.Sprintf("AndroClaw/%s", config.Version)
+@@ -203,11 +229,15 @@
+ 	case "litellm", "lmstudio", "gpt4free", "openrouter", "groq", "zhipu", "nvidia", "venice",
+ 		"nearai", "ollama", "moonshot", "shengsuanyun", "siliconflow", "deepseek", "cerebras",
+ 		"vivgrid", "volcengine", "vllm", "qwen-portal", "qwen-intl", "qwen-us", "mistral",
+-		"avian", "longcat", "modelscope", "novita", "alibaba-coding", "zai", "mimo":
++		"avian", "longcat", "modelscope", "novita", "alibaba-coding", "zai", "mimo",
++		"opencode-go", "custom":
+ 		// All other OpenAI-compatible HTTP providers
+ 		if cfg.APIKey() == "" && cfg.APIBase == "" && !isEmptyAPIKeyAllowed(protocol) {
+ 			return nil, "", fmt.Errorf("api_key or api_base is required for HTTP-based protocol %q", protocol)
+ 		}
++		if protocol == "custom" && cfg.APIBase == "" {
++			return nil, "", fmt.Errorf("api_base is required for protocol %q", protocol)
++		}
+ 		apiBase := cfg.APIBase
+ 		if apiBase == "" {
+ 			apiBase = getDefaultAPIBase(protocol)
+--- a/web/backend/api/models.go
++++ b/web/backend/api/models.go
+@@ -167,6 +167,19 @@
+ 	}
+ 	if mc.Provider == "antigravity" && mc.AuthMethod == "" {
+ 		mc.AuthMethod = "oauth"
++	}
++	if mc.APIBase == "" {
++		mc.APIBase = providers.DefaultAPIBaseForProtocol(mc.Provider)
++	}
++	if defaults := providers.DefaultHeadersFor(mc.Provider); len(defaults) > 0 {
++		if mc.CustomHeaders == nil {
++			mc.CustomHeaders = make(map[string]string, len(defaults))
++		}
++		for name, value := range defaults {
++			if _, exists := mc.CustomHeaders[name]; !exists {
++				mc.CustomHeaders[name] = value
++			}
++		}
+ 	}
+ }
+ 
+@@ -1265,7 +1278,7 @@
+ 	default:
+ 		// OpenAI-compatible: /v1/models
+ 		fetchURL = apiBase + "/models"
+-		return fetchOpenAICompatibleModels(ctx, fetchURL, apiKey)
++		return fetchOpenAICompatibleModelsWithHeaders(ctx, fetchURL, apiKey, providers.DefaultHeadersFor(provider))
+ 	}
+ }
+ 
+@@ -1317,6 +1330,14 @@
+ }
+ 
+ func fetchOpenAICompatibleModels(ctx context.Context, fetchURL, apiKey string) ([]upstreamModel, error) {
++	return fetchOpenAICompatibleModelsWithHeaders(ctx, fetchURL, apiKey, nil)
++}
++
++func fetchOpenAICompatibleModelsWithHeaders(
++	ctx context.Context,
++	fetchURL, apiKey string,
++	headers map[string]string,
++) ([]upstreamModel, error) {
+ 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
+ 	if err != nil {
+ 		return nil, err
+@@ -1324,6 +1345,9 @@
+ 	if apiKey = strings.TrimSpace(apiKey); apiKey != "" {
+ 		req.Header.Set("Authorization", "Bearer "+apiKey)
+ 	}
++	for name, value := range headers {
++		req.Header.Set(name, value)
++	}
+ 
+ 	resp, err := http.DefaultClient.Do(req)
+ 	if err != nil {

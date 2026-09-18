@@ -1,0 +1,52 @@
+--- a/web/backend/main.go
++++ b/web/backend/main.go
+@@ -396,7 +396,40 @@
+ 
+ 	return launcherAllowlistBypassLogDecision{}
+ }
++
++// dashboardSessionFile is where the dashboard session token is persisted (mode 0600)
++// inside the app home so the console stays authenticated across service restarts.
++const dashboardSessionFile = "launcher_session"
+ 
++// loadOrCreateDashboardSession returns a stable dashboard session cookie value.
++//
++// Upstream generates a random token per process, so every service restart (reboot,
++// app update, crash) invalidated the browser cookie and forced a re-login. AndroClaw
++// runs the console as an always-on appliance (VPN-like), so we persist the token in
++// the app-private home and reuse it until the user logs out.
++func loadOrCreateDashboardSession(picoHome string) (string, error) {
++	path := filepath.Join(picoHome, dashboardSessionFile)
++	if data, err := os.ReadFile(path); err == nil {
++		if v := strings.TrimSpace(string(data)); v != "" {
++			return v, nil
++		}
++	} else if !errors.Is(err, os.ErrNotExist) {
++		return "", err
++	}
++
++	v, err := middleware.NewLauncherDashboardSessionCookie()
++	if err != nil {
++		return "", err
++	}
++	if err := os.MkdirAll(picoHome, 0o700); err != nil {
++		return "", err
++	}
++	if err := os.WriteFile(path, []byte(v), 0o600); err != nil {
++		return "", err
++	}
++	return v, nil
++}
++
+ func main() {
+ 	port := flag.String("port", "18800", "Port to listen on")
+ 	host := flag.String("host", "", "Host to listen on (overrides -public when set)")
+@@ -572,7 +605,7 @@
+ 	}
+ 	listeners := openResult.Listeners
+ 
+-	dashboardSessionCookie, dashErr := middleware.NewLauncherDashboardSessionCookie()
++	dashboardSessionCookie, dashErr := loadOrCreateDashboardSession(picoHome)
+ 	if dashErr != nil {
+ 		logger.Fatalf("Dashboard auth setup failed: %v", dashErr)
+ 	}
